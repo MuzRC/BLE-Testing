@@ -28,19 +28,23 @@ class MainActivity : AppCompatActivity() {
     private var bleAdvertiser: BluetoothLeAdvertiser? = null
 
     // Simpanan data signal yang disalin
-    private var capturedManufacturerId: Int = -1
+    private var capturedManufacturerId: Int = 0x004C // Default fallback (Apple ID format biasa beacon)
     private var capturedManufacturerData: ByteArray? = null
 
     // Callback pemancar
     private val advertiseCallback = object : AdvertiseCallback() {
         override fun onStartSuccess(settingsInEffect: AdvertiseSettings?) {
             super.onStartSuccess(settingsInEffect)
-            tvStatus.text = "Signal klon sedang dipancarkan secara aktif!"
+            runOnUiThread {
+                tvStatus.text = "Signal klon sedang dipancarkan secara aktif!"
+            }
         }
 
         override fun onStartFailure(errorCode: Int) {
             super.onStartFailure(errorCode)
-            tvStatus.text = "Gagal memancar. Ralat kod: $errorCode"
+            runOnUiThread {
+                tvStatus.text = "Gagal memancar. Ralat kod: $errorCode"
+            }
         }
     }
 
@@ -50,23 +54,39 @@ class MainActivity : AppCompatActivity() {
         override fun onScanResult(callbackType: Int, result: ScanResult?) {
             super.onScanResult(callbackType, result)
             val record = result?.scanRecord ?: return
+            val device = result.device
+
+            val devName = device?.name ?: record.deviceName ?: "Peranti Tanpa Nama"
+            val devAddress = device?.address ?: "Alamat Tersembunyi"
             val manData = record.manufacturerSpecificData
 
-            if (manData.size() > 0) {
-                capturedManufacturerId = manData.keyAt(0)
-                capturedManufacturerData = manData.valueAt(0)
+            // Kemas kini UI serta-merta bila ada apa-apa signal dikesan
+            runOnUiThread {
+                if (manData.size() > 0) {
+                    capturedManufacturerId = manData.keyAt(0)
+                    capturedManufacturerData = manData.valueAt(0)
+                    bleScanner?.stopScan(this@scanCallback)
 
-                bleScanner?.stopScan(this)
+                    val hexData = capturedManufacturerData?.joinToString("") { "%02X".format(it) } ?: "TIADA"
+                    tvStatus.text = "BERJAYA SALIN!\nNama: $devName\nMAC: $devAddress\nID: $capturedManufacturerId\nData: $hexData"
+                    Toast.makeText(this@MainActivity, "Data BLE berjaya disalin!", Toast.LENGTH_SHORT).show()
+                } else {
+                    // Kalau peranti tiada Manufacturer Data, buat fallback guna raw bytes
+                    val rawBytes = record.bytes
+                    capturedManufacturerData = rawBytes.take(20).toByteArray()
+                    bleScanner?.stopScan(this@scanCallback)
 
-                val hexData = capturedManufacturerData?.joinToString("") { "%02X".format(it) } ?: "TIADA"
-                tvStatus.text = "Signal Disalin!\nID: $capturedManufacturerId\nPayload (Hex): $hexData"
-                Toast.makeText(this@MainActivity, "Data BLE berjaya disalin!", Toast.LENGTH_SHORT).show()
+                    tvStatus.text = "SIGNAL DIKESAN (Raw Data)!\nNama: $devName\nMAC: $devAddress\nData disalin dari paket siaran."
+                    Toast.makeText(this@MainActivity, "Paket mentah disalin!", Toast.LENGTH_SHORT).show()
+                }
             }
         }
 
         override fun onScanFailed(errorCode: Int) {
             super.onScanFailed(errorCode)
-            tvStatus.text = "Imbasan gagal. Ralat kod: $errorCode"
+            runOnUiThread {
+                tvStatus.text = "Imbasan gagal. Ralat kod: $errorCode"
+            }
         }
     }
 
@@ -76,7 +96,7 @@ class MainActivity : AppCompatActivity() {
     ) { permissions ->
         val allGranted = permissions.entries.all { it.value }
         if (!allGranted) {
-            Toast.makeText(this, "Kebenaran Bluetooth diperlukan untuk app ini berfungsi.", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Kebenaran Bluetooth & Lokasi diperlukan!", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -120,10 +140,11 @@ class MainActivity : AppCompatActivity() {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
                 permissionsToRequest.add(Manifest.permission.BLUETOOTH_CONNECT)
             }
-        } else {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                permissionsToRequest.add(Manifest.permission.ACCESS_FINE_LOCATION)
-            }
+        }
+        
+        // Tetap minta Lokasi kerana sesetengah OEM mewajibkannya untuk scan BLE
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            permissionsToRequest.add(Manifest.permission.ACCESS_FINE_LOCATION)
         }
 
         if (permissionsToRequest.isNotEmpty()) {
@@ -134,7 +155,7 @@ class MainActivity : AppCompatActivity() {
     @SuppressLint("MissingPermission")
     private fun mulaImbas() {
         if (bluetoothAdapter == null || !bluetoothAdapter!!.isEnabled) {
-            tvStatus.text = "Sila aktifkan Bluetooth telefon dulu."
+            tvStatus.text = "Sila hidupkan Bluetooth telefon dahulu."
             return
         }
 
@@ -144,8 +165,14 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        tvStatus.text = "Sedang mengimbas signal BLE..."
-        bleScanner?.startScan(scanCallback)
+        tvStatus.text = "Sedang mengimbas signal BLE...\n(Pastikan GPS telefon dihidupkan)"
+
+        // Tetapkan mod imbasan Low Latency untuk respon pantas
+        val settings = ScanSettings.Builder()
+            .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
+            .build()
+
+        bleScanner?.startScan(null, settings, scanCallback)
     }
 
     @SuppressLint("MissingPermission")
@@ -157,7 +184,7 @@ class MainActivity : AppCompatActivity() {
 
         bleAdvertiser = bluetoothAdapter?.bluetoothLeAdvertiser
         if (bleAdvertiser == null || !bluetoothAdapter!!.isMultipleAdvertisementSupported) {
-            tvStatus.text = "Telefon ini tidak menyokong BLE Advertising (cip radio terhad)."
+            tvStatus.text = "Telefon ini tidak menyokong penyiaran BLE (cip radio terhad)."
             return
         }
 
