@@ -1,0 +1,38 @@
+name: Build BLE Testing APK
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch: # Butang manual untuk run build bila-bila masa
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      # Pasang Gradle versi 8.2 secara terus di server runner
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.2'
+
+      # Compile Debug APK terus tanpa perlukan gradlew tempatan
+      - name: Build APK with Gradle
+        run: gradle assembleDebug --stacktrace
+
+      # Muat naik fail APK ke tab Artifacts
+      - name: Upload Debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: BLE-Testing-Debug
+          path: app/build/outputs/apk/debug/*.apk
+          retention-days: 7
