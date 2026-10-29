@@ -28,7 +28,7 @@ class MainActivity : AppCompatActivity() {
     private var bleAdvertiser: BluetoothLeAdvertiser? = null
 
     // Simpanan data signal yang disalin
-    private var capturedManufacturerId: Int = 0x004C // Default fallback (Apple ID format biasa beacon)
+    private var capturedManufacturerId: Int = 0x004C
     private var capturedManufacturerData: ByteArray? = null
 
     // Callback pemancar
@@ -56,28 +56,28 @@ class MainActivity : AppCompatActivity() {
             val record = result?.scanRecord ?: return
             val device = result.device
 
-            val devName = device?.name ?: record.deviceName ?: "Peranti Tanpa Nama"
+            val devName = record.deviceName ?: device?.name ?: "Peranti Tanpa Nama"
             val devAddress = device?.address ?: "Alamat Tersembunyi"
             val manData = record.manufacturerSpecificData
 
-            // Kemas kini UI serta-merta bila ada apa-apa signal dikesan
             runOnUiThread {
-                if (manData.size() > 0) {
+                if (manData != null && manData.size() > 0) {
                     capturedManufacturerId = manData.keyAt(0)
                     capturedManufacturerData = manData.valueAt(0)
-                    bleScanner?.stopScan(this@scanCallback)
+                    bleScanner?.stopScan(this)
 
                     val hexData = capturedManufacturerData?.joinToString("") { "%02X".format(it) } ?: "TIADA"
                     tvStatus.text = "BERJAYA SALIN!\nNama: $devName\nMAC: $devAddress\nID: $capturedManufacturerId\nData: $hexData"
                     Toast.makeText(this@MainActivity, "Data BLE berjaya disalin!", Toast.LENGTH_SHORT).show()
                 } else {
-                    // Kalau peranti tiada Manufacturer Data, buat fallback guna raw bytes
                     val rawBytes = record.bytes
-                    capturedManufacturerData = rawBytes.take(20).toByteArray()
-                    bleScanner?.stopScan(this@scanCallback)
+                    if (rawBytes != null && rawBytes.isNotEmpty()) {
+                        capturedManufacturerData = rawBytes.take(20).toByteArray()
+                        bleScanner?.stopScan(this)
 
-                    tvStatus.text = "SIGNAL DIKESAN (Raw Data)!\nNama: $devName\nMAC: $devAddress\nData disalin dari paket siaran."
-                    Toast.makeText(this@MainActivity, "Paket mentah disalin!", Toast.LENGTH_SHORT).show()
+                        tvStatus.text = "SIGNAL DIKESAN (Raw Data)!\nNama: $devName\nMAC: $devAddress\nData disalin dari paket siaran."
+                        Toast.makeText(this@MainActivity, "Paket mentah disalin!", Toast.LENGTH_SHORT).show()
+                    }
                 }
             }
         }
@@ -141,8 +141,7 @@ class MainActivity : AppCompatActivity() {
                 permissionsToRequest.add(Manifest.permission.BLUETOOTH_CONNECT)
             }
         }
-        
-        // Tetap minta Lokasi kerana sesetengah OEM mewajibkannya untuk scan BLE
+
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             permissionsToRequest.add(Manifest.permission.ACCESS_FINE_LOCATION)
         }
@@ -167,17 +166,17 @@ class MainActivity : AppCompatActivity() {
 
         tvStatus.text = "Sedang mengimbas signal BLE...\n(Pastikan GPS telefon dihidupkan)"
 
-        // Tetapkan mod imbasan Low Latency untuk respon pantas
         val settings = ScanSettings.Builder()
             .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
             .build()
 
-        bleScanner?.startScan(null, settings, scanCallback)
+        bleScanner?.startScan(emptyList(), settings, scanCallback)
     }
 
     @SuppressLint("MissingPermission")
     private fun mulaPancar() {
-        if (capturedManufacturerData == null) {
+        val dataToBroadcast = capturedManufacturerData
+        if (dataToBroadcast == null) {
             tvStatus.text = "Tiada data tersimpan! Imbas dulu peranti sasaran."
             return
         }
@@ -197,7 +196,7 @@ class MainActivity : AppCompatActivity() {
         val data = AdvertiseData.Builder()
             .setIncludeDeviceName(false)
             .setIncludeTxPowerLevel(false)
-            .addManufacturerData(capturedManufacturerId, capturedManufacturerData!!)
+            .addManufacturerData(capturedManufacturerId, dataToBroadcast)
             .build()
 
         tvStatus.text = "Memulakan pemancaran klon..."
