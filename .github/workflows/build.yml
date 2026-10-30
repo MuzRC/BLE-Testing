@@ -1,8 +1,5 @@
 name: Build BLE Testing APK
 
-on:
-  push:
-    branches: [ "main" ]
   workflow_dispatch: # Butang manual untuk run build bila-bila masa
 
 jobs:
