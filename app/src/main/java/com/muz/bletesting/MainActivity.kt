@@ -1,5 +1,5 @@
 // ==========================================
-// BAHAGIAN 1: IMPORTS, STRUCT & LIFECYCLE
+// BAHAGIAN 1: IMPORTS, STRUCT, LIFECYCLE & STORAN
 // (Salin bahagian ini dahulu)
 // ==========================================
 
@@ -59,7 +59,7 @@ class MainActivity : AppCompatActivity() {
     private var bleScanner: BluetoothLeScanner? = null
     private var bleAdvertiser: BluetoothLeAdvertiser? = null
 
-    // Guna CopyOnWriteArrayList supaya thread-safe semasa imbasan laju
+    // Thread-safe list untuk menampung data daripada background imbasan
     private val deviceList = CopyOnWriteArrayList<BleTarget>()
     private lateinit var listAdapter: ArrayAdapter<BleTarget>
     private var selectedTarget: BleTarget? = null
@@ -68,8 +68,9 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var sharedPreferences: SharedPreferences
 
-    // Throttling UI elak skrin jem bila lambakan isyarat masuk serentak
+    // Throttling UI dengan penanda Volatile untuk elak race-condition antara thread
     private val updateHandler = Handler(Looper.getMainLooper())
+    @Volatile
     private var pendingUiUpdate = false
     private val uiUpdateRunnable = Runnable {
         listAdapter.notifyDataSetChanged()
@@ -106,7 +107,8 @@ class MainActivity : AppCompatActivity() {
                 if (item != null) {
                     text1.text = "${item.name} (${item.rssi} dBm)"
                     val hex = item.manufacturerData.joinToString("") { "%02X".format(it) }
-                    text2.text = "MAC: ${item.address}\nID: ${item.manufacturerId} | Data: $hex"
+                    val manIdDisplay = if (item.manufacturerId != -1) item.manufacturerId.toString() else "Tiada (Raw)"
+                    text2.text = "MAC: ${item.address}\nID: $manIdDisplay | Data: $hex"
                 }
                 return view
             }
@@ -115,7 +117,6 @@ class MainActivity : AppCompatActivity() {
 
         muatDataTersimpan()
 
-        // Ambil data terus melalui adapter supaya bebas daripada ralat index out of bounds
         lvDevices.setOnItemClickListener { _, _, position, _ ->
             val item = listAdapter.getItem(position) ?: return@setOnItemClickListener
             selectedTarget = item
@@ -191,9 +192,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun hexToByteArray(hex: String): ByteArray {
-        val cleanHex = if (hex.length % 2 != 0) "0$hex" else hex
-        return ByteArray(cleanHex.length / 2) { i ->
-            cleanHex.substring(i * 2, i * 2 + 2).toInt(16).toByte()
+        return try {
+            val cleanHex = hex.replace(" ", "").trim()
+            val formatted = if (cleanHex.length % 2 != 0) "0$cleanHex" else cleanHex
+            ByteArray(formatted.length / 2) { i ->
+                formatted.substring(i * 2, i * 2 + 2).toInt(16).toByte()
+            }
+        } catch (e: Exception) {
+            ByteArray(0)
         }
     }
 // ==========================================
@@ -220,16 +226,16 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun ekstrakTeksAscii(bytes: ByteArray): String? {
-        var currentChunk = StringBuilder()
+        val currentChunk = StringBuilder()
         for (b in bytes) {
-            val c = b.toInt().toChar()
+            val c = (b.toInt() and 0xFF).toChar()
             if (c in '0'..'9' || c in 'A'..'Z' || c in 'a'..'z' || c == '-' || c == '_') {
                 currentChunk.append(c)
             } else {
                 if (currentChunk.length >= 4) {
                     return currentChunk.toString()
                 }
-                currentChunk = StringBuilder()
+                currentChunk.clear()
             }
         }
         return if (currentChunk.length >= 4) currentChunk.toString() else null
@@ -237,18 +243,23 @@ class MainActivity : AppCompatActivity() {
 
     private fun cariNamaDalamRawBytes(bytes: ByteArray?): String? {
         if (bytes == null) return null
-        var index = 0
-        while (index < bytes.size) {
-            val length = bytes[index].toInt() and 0xFF
-            if (length == 0 || index + length >= bytes.size) break
-            val type = bytes[index + 1].toInt() and 0xFF
-            if (type == 0x08 || type == 0x09) {
-                val nameBytes = bytes.copyOfRange(index + 2, index + 1 + length)
-                return String(nameBytes, Charsets.UTF_8).trim()
+        return try {
+            var index = 0
+            while (index < bytes.size) {
+                val length = bytes[index].toInt() and 0xFF
+                if (length == 0 || index + 1 + length > bytes.size) break
+                val type = bytes[index + 1].toInt() and 0xFF
+                // 0x08 = Shortened Local Name, 0x09 = Complete Local Name
+                if (type == 0x08 || type == 0x09) {
+                    val nameBytes = bytes.copyOfRange(index + 2, index + 1 + length)
+                    return String(nameBytes, Charsets.UTF_8).trim()
+                }
+                index += length + 1
             }
-            index += length + 1
+            null
+        } catch (e: Exception) {
+            null
         }
-        return null
     }
 
     private fun tentukanNamaPeranti(record: ScanRecord, rawDeviceName: String?, manId: Int, payload: ByteArray): String {
@@ -279,7 +290,7 @@ class MainActivity : AppCompatActivity() {
     ) { permissions ->
         val allGranted = permissions.entries.all { it.value }
         if (!allGranted) {
-            Toast.makeText(this, "Kebenaran Bluetooth & Lokasi diperlukan!", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Kebenaran Bluetooth & Lokasi diperlukan untuk operasi penuh!", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -305,6 +316,10 @@ class MainActivity : AppCompatActivity() {
             }
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
                 permissionsToRequest.add(Manifest.permission.BLUETOOTH_CONNECT)
+            }
+            // Tambah FINE_LOCATION sekiranya manifest tidak menggunakan neverForLocation
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                permissionsToRequest.add(Manifest.permission.ACCESS_FINE_LOCATION)
             }
         } else {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
@@ -352,7 +367,6 @@ class MainActivity : AppCompatActivity() {
             }
 
             if (payload != null) {
-                // Elak SecurityException bila akses device.name pada Android 12+
                 val rawDeviceName = try {
                     device.name
                 } catch (e: SecurityException) {
@@ -371,7 +385,7 @@ class MainActivity : AppCompatActivity() {
 
                 if (!pendingUiUpdate) {
                     pendingUiUpdate = true
-                    updateHandler.postDelayed(uiUpdateRunnable, 500)
+                    updateHandler.postDelayed(uiUpdateRunnable, 400)
                 }
             }
         }
@@ -388,7 +402,7 @@ class MainActivity : AppCompatActivity() {
     private fun mulaImbas() {
         if (!adaKebenaranBle()) {
             semakKebenaran()
-            tvStatus.text = "Kebenaran belum lengkap. Sila benarkan akses."
+            tvStatus.text = "Kebenaran Bluetooth belum lengkap. Sila benarkan akses dahulu."
             return
         }
 
@@ -407,7 +421,7 @@ class MainActivity : AppCompatActivity() {
 
         bleScanner = bluetoothAdapter?.bluetoothLeScanner
         if (bleScanner == null) {
-            tvStatus.text = "Cip BLE Scanner tidak dijumpai."
+            tvStatus.text = "Cip BLE Scanner tidak dijumpai atau Bluetooth belum bersedia."
             return
         }
 
@@ -427,7 +441,7 @@ class MainActivity : AppCompatActivity() {
         } catch (e: Exception) {
             tvStatus.text = "Ralat imbas: ${e.localizedMessage}"
             isScanning = false
-            btnScan.text = "1. Mula Imbas Signal"
+            btnScan.text = "Mula Imbas"
         }
     }
 
@@ -437,10 +451,10 @@ class MainActivity : AppCompatActivity() {
             try {
                 bleScanner?.stopScan(scanCallback)
             } catch (e: Exception) {
-                // Abaikan jika Bluetooth adapter terpadam tiba-tiba
+                // Abaikan ralat sekiranya adapter ditutup secara mengejut
             }
             isScanning = false
-            btnScan.text = "1. Mula Imbas Signal"
+            btnScan.text = "Mula Imbas"
         }
         updateHandler.removeCallbacks(uiUpdateRunnable)
         pendingUiUpdate = false
@@ -520,12 +534,12 @@ class MainActivity : AppCompatActivity() {
         }
 
         bleAdvertiser = bluetoothAdapter?.bluetoothLeAdvertiser
-        if (bleAdvertiser == null || !bluetoothAdapter!!.isMultipleAdvertisementSupported) {
+        // Semakan bleAdvertiser != null sudah mencukupi tanpa sekatan ketat isMultipleAdvertisementSupported
+        if (bleAdvertiser == null) {
             tvStatus.text = "Telefon ini tidak menyokong fungsi pemancar BLE (cip terhad)."
             return
         }
 
-        // Hentikan sesi aktif terdahulu bagi mengelak ralat ALREADY_STARTED
         if (isAdvertising) {
             hentiPancar()
         }
@@ -536,6 +550,7 @@ class MainActivity : AppCompatActivity() {
             .setConnectable(false)
             .build()
 
+        // Had standard Legacy BLE Advertising: maksima 24 bait payload untuk elak overflow 31 bait
         val payload = if (target.manufacturerData.size > 24) {
             target.manufacturerData.copyOfRange(0, 24)
         } else {
@@ -564,7 +579,7 @@ class MainActivity : AppCompatActivity() {
         try {
             bleAdvertiser?.stopAdvertising(advertiseCallback)
         } catch (e: Exception) {
-            // Tangkap sebarang ralat jika Bluetooth ditutup dari luar
+            // Tangkap ralat jika perkhidmatan terputus dari luar
         }
         isAdvertising = false
         tvStatus.text = "Pancaran klon telah dihentikan sepenuhnya."
