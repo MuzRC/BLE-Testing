@@ -9,12 +9,21 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
-import android.widget.Button
-import android.widget.TextView
-import android.widget.Toast
+import android.view.View
+import android.view.ViewGroup
+import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+
+// Model data untuk simpan maklumat setiap peranti BLE
+data class BleTarget(
+    val name: String,
+    val address: String,
+    val manufacturerId: Int,
+    val manufacturerData: ByteArray,
+    val rssi: Int
+)
 
 class MainActivity : AppCompatActivity() {
 
@@ -22,21 +31,23 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnScan: Button
     private lateinit var btnBroadcast: Button
     private lateinit var btnStopBroadcast: Button
+    private lateinit var lvDevices: ListView
 
     private var bluetoothAdapter: BluetoothAdapter? = null
     private var bleScanner: BluetoothLeScanner? = null
     private var bleAdvertiser: BluetoothLeAdvertiser? = null
 
-    // Simpanan data signal yang disalin
-    private var capturedManufacturerId: Int = 0x004C
-    private var capturedManufacturerData: ByteArray? = null
+    private val deviceList = mutableListOf<BleTarget>()
+    private lateinit var listAdapter: ArrayAdapter<BleTarget>
+    private var selectedTarget: BleTarget? = null
+    private var isScanning = false
 
-    // Callback pemancar
+    // Callback pemancar klon
     private val advertiseCallback = object : AdvertiseCallback() {
         override fun onStartSuccess(settingsInEffect: AdvertiseSettings?) {
             super.onStartSuccess(settingsInEffect)
             runOnUiThread {
-                tvStatus.text = "Signal klon sedang dipancarkan secara aktif!"
+                tvStatus.text = "Signal klon [${selectedTarget?.name}] sedang dipancarkan secara aktif!"
             }
         }
 
@@ -48,36 +59,42 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // Callback pengimbas
+    // Callback imbasan BLE
     private val scanCallback = object : ScanCallback() {
         @SuppressLint("MissingPermission")
         override fun onScanResult(callbackType: Int, result: ScanResult?) {
             super.onScanResult(callbackType, result)
             val record = result?.scanRecord ?: return
-            val device = result.device
+            val device = result.device ?: return
 
-            val devName = record.deviceName ?: device?.name ?: "Peranti Tanpa Nama"
-            val devAddress = device?.address ?: "Alamat Tersembunyi"
+            val devName = record.deviceName ?: device.name ?: "Peranti Tanpa Nama"
+            val devAddress = device.address ?: return
             val manData = record.manufacturerSpecificData
 
-            runOnUiThread {
-                if (manData != null && manData.size() > 0) {
-                    capturedManufacturerId = manData.keyAt(0)
-                    capturedManufacturerData = manData.valueAt(0)
-                    bleScanner?.stopScan(this)
+            var mId = 0x004C // Default fallback ID
+            var payload: ByteArray? = null
 
-                    val hexData = capturedManufacturerData?.joinToString("") { "%02X".format(it) } ?: "TIADA"
-                    tvStatus.text = "BERJAYA SALIN!\nNama: $devName\nMAC: $devAddress\nID: $capturedManufacturerId\nData: $hexData"
-                    Toast.makeText(this@MainActivity, "Data BLE berjaya disalin!", Toast.LENGTH_SHORT).show()
-                } else {
-                    val rawBytes = record.bytes
-                    if (rawBytes != null && rawBytes.isNotEmpty()) {
-                        capturedManufacturerData = rawBytes.take(20).toByteArray()
-                        bleScanner?.stopScan(this)
+            if (manData != null && manData.size() > 0) {
+                mId = manData.keyAt(0)
+                payload = manData.valueAt(0)
+            } else {
+                val rawBytes = record.bytes
+                if (rawBytes != null && rawBytes.isNotEmpty()) {
+                    payload = rawBytes.take(20).toByteArray()
+                }
+            }
 
-                        tvStatus.text = "SIGNAL DIKESAN (Raw Data)!\nNama: $devName\nMAC: $devAddress\nData disalin dari paket siaran."
-                        Toast.makeText(this@MainActivity, "Paket mentah disalin!", Toast.LENGTH_SHORT).show()
+            if (payload != null) {
+                val target = BleTarget(devName, devAddress, mId, payload, result.rssi)
+
+                runOnUiThread {
+                    val existingIndex = deviceList.indexOfFirst { it.address == devAddress }
+                    if (existingIndex != -1) {
+                        deviceList[existingIndex] = target
+                    } else {
+                        deviceList.add(target)
                     }
+                    listAdapter.notifyDataSetChanged()
                 }
             }
         }
@@ -90,7 +107,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // Pengurus kebenaran (Permission Launcher)
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
@@ -108,14 +124,53 @@ class MainActivity : AppCompatActivity() {
         btnScan = findViewById(R.id.btnScan)
         btnBroadcast = findViewById(R.id.btnBroadcast)
         btnStopBroadcast = findViewById(R.id.btnStopBroadcast)
+        lvDevices = findViewById(R.id.lvDevices)
 
         val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
         bluetoothAdapter = bluetoothManager.adapter
 
+        // Adapter untuk ListView (paparan nama & data hex)
+        listAdapter = object : ArrayAdapter<BleTarget>(
+            this,
+            android.R.layout.simple_list_item_2,
+            android.R.id.text1,
+            deviceList
+        ) {
+            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                val view = super.getView(position, convertView, parent)
+                val text1 = view.findViewById<TextView>(android.R.id.text1)
+                val text2 = view.findViewById<TextView>(android.R.id.text2)
+
+                val item = getItem(position)
+                if (item != null) {
+                    text1.text = "${item.name} (${item.rssi} dBm)"
+                    val hex = item.manufacturerData.joinToString("") { "%02X".format(it) }
+                    text2.text = "MAC: ${item.address}\nID: ${item.manufacturerId} | Data: $hex"
+                }
+                return view
+            }
+        }
+        lvDevices.adapter = listAdapter
+
+        // Tindakan bila pengguna ketik mana-mana peranti dalam senarai
+        lvDevices.setOnItemClickListener { _, _, position, _ ->
+            val item = deviceList[position]
+            selectedTarget = item
+            hentiImbas()
+
+            val hexData = item.manufacturerData.joinToString("") { "%02X".format(it) }
+            tvStatus.text = "DIPILIH:\nNama: ${item.name}\nMAC: ${item.address}\nID: ${item.manufacturerId}\nHex: $hexData\n\n(Sedia dipancar! Tekan butang '2. Pancar Klon')"
+            Toast.makeText(this, "Peranti ${item.name} dipilih!", Toast.LENGTH_SHORT).show()
+        }
+
         semakKebenaran()
 
         btnScan.setOnClickListener {
-            mulaImbas()
+            if (isScanning) {
+                hentiImbas()
+            } else {
+                mulaImbas()
+            }
         }
 
         btnBroadcast.setOnClickListener {
@@ -164,7 +219,13 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        tvStatus.text = "Sedang mengimbas signal BLE...\n(Pastikan GPS telefon dihidupkan)"
+        deviceList.clear()
+        listAdapter.notifyDataSetChanged()
+        selectedTarget = null
+
+        isScanning = true
+        btnScan.text = "Henti Imbas"
+        tvStatus.text = "Sedang mengimbas... Ketik mana-mana peranti di bawah untuk menyalin."
 
         val settings = ScanSettings.Builder()
             .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
@@ -174,16 +235,25 @@ class MainActivity : AppCompatActivity() {
     }
 
     @SuppressLint("MissingPermission")
+    private fun hentiImbas() {
+        if (isScanning) {
+            bleScanner?.stopScan(scanCallback)
+            isScanning = false
+            btnScan.text = "1. Mula Imbas Signal"
+        }
+    }
+
+    @SuppressLint("MissingPermission")
     private fun mulaPancar() {
-        val dataToBroadcast = capturedManufacturerData
-        if (dataToBroadcast == null) {
-            tvStatus.text = "Tiada data tersimpan! Imbas dulu peranti sasaran."
+        val target = selectedTarget
+        if (target == null) {
+            tvStatus.text = "Tiada signal dipilih! Sila ketik satu peranti dalam senarai dahulu."
             return
         }
 
         bleAdvertiser = bluetoothAdapter?.bluetoothLeAdvertiser
         if (bleAdvertiser == null || !bluetoothAdapter!!.isMultipleAdvertisementSupported) {
-            tvStatus.text = "Telefon ini tidak menyokong penyiaran BLE (cip radio terhad)."
+            tvStatus.text = "Telefon ini tidak menyokong mod pemancar BLE (cip radio terhad)."
             return
         }
 
@@ -193,13 +263,20 @@ class MainActivity : AppCompatActivity() {
             .setConnectable(false)
             .build()
 
+        // Hadkan data iklan kepada maksima 24 bait agar tidak melebihi had 31 bait BLE
+        val payload = if (target.manufacturerData.size > 24) {
+            target.manufacturerData.copyOfRange(0, 24)
+        } else {
+            target.manufacturerData
+        }
+
         val data = AdvertiseData.Builder()
             .setIncludeDeviceName(false)
             .setIncludeTxPowerLevel(false)
-            .addManufacturerData(capturedManufacturerId, dataToBroadcast)
+            .addManufacturerData(target.manufacturerId, payload)
             .build()
 
-        tvStatus.text = "Memulakan pemancaran klon..."
+        tvStatus.text = "Memancarkan klon: ${target.name} (${target.address})..."
         bleAdvertiser?.startAdvertising(settings, data, advertiseCallback)
     }
 
@@ -207,5 +284,11 @@ class MainActivity : AppCompatActivity() {
     private fun hentiPancar() {
         bleAdvertiser?.stopAdvertising(advertiseCallback)
         tvStatus.text = "Pancaran klon telah dihentikan."
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        hentiImbas()
+        hentiPancar()
     }
 }
