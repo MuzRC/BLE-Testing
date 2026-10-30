@@ -1,10 +1,12 @@
-name: Build BLE Testing APK
+name: Build Signed BLE Testing APK
 
 on:
-  workflow_dispatch: # Butang manual untuk run build bila-bila masa
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
 
 jobs:
-  build:
+  build-release:
     runs-on: ubuntu-latest
 
     steps:
@@ -17,20 +19,37 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      # Pasang Gradle versi 8.2 secara terus di server runner
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
         with:
           gradle-version: '8.2'
 
-      # Compile Debug APK terus tanpa perlukan gradlew tempatan
-      - name: Build APK with Gradle
-        run: gradle assembleDebug --stacktrace
+      # Jana fail Keystore sah secara terus di dalam server runner
+      - name: Generate Release Keystore
+        run: |
+          keytool -genkeypair -v \
+            -keystore app/release.jks \
+            -alias blekey \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -storepass "MuzRelease2026!" \
+            -keypass "MuzRelease2026!" \
+            -dname "CN=Muz, OU=Testing, O=MuzRC, L=Beaufort, ST=Sabah, C=MY"
 
-      # Muat naik fail APK ke tab Artifacts
-      - name: Upload Debug APK
+      # Bina Signed Release APK
+      - name: Build Signed Release APK
+        run: gradle app:assembleRelease --stacktrace
+
+      # Padam fail fizikal keystore selepas siap compile demi keselamatan
+      - name: Clean Keystore
+        if: always()
+        run: rm -f app/release.jks
+
+      # Muat naik fail APK Release ke tab Artifacts
+      - name: Upload Signed Release APK
         uses: actions/upload-artifact@v4
         with:
-          name: BLE-Testing-Debug
-          path: app/build/outputs/apk/debug/*.apk
+          name: BLE-Testing-Signed-Release-APK
+          path: app/build/outputs/apk/release/*.apk
           retention-days: 7
