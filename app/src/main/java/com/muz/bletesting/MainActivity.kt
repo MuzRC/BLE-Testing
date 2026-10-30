@@ -6,6 +6,7 @@ import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.bluetooth.le.*
 import android.content.Context
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -40,6 +41,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var listAdapter: ArrayAdapter<BleTarget>
     private var selectedTarget: BleTarget? = null
     private var isScanning = false
+
+    private lateinit var sharedPreferences: SharedPreferences
 
     // Callback pemancar klon
     private val advertiseCallback = object : AdvertiseCallback() {
@@ -83,7 +86,6 @@ class MainActivity : AppCompatActivity() {
             }
 
             if (payload != null) {
-                // Tentukan nama pintar berdasarkan data mentah
                 val finalName = tentukanNamaPeranti(record, device.name, mId, payload)
                 val target = BleTarget(finalName, devAddress, mId, payload, result.rssi)
 
@@ -105,6 +107,111 @@ class MainActivity : AppCompatActivity() {
                 tvStatus.text = "Imbasan gagal. Ralat kod: $errorCode"
             }
         }
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+
+        sharedPreferences = getSharedPreferences("BLE_STORAGE", Context.MODE_PRIVATE)
+
+        tvStatus = findViewById(R.id.tvStatus)
+        btnScan = findViewById(R.id.btnScan)
+        btnBroadcast = findViewById(R.id.btnBroadcast)
+        btnStopBroadcast = findViewById(R.id.btnStopBroadcast)
+        lvDevices = findViewById(R.id.lvDevices)
+
+        val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
+        bluetoothAdapter = bluetoothManager.adapter
+
+        listAdapter = object : ArrayAdapter<BleTarget>(
+            this,
+            android.R.layout.simple_list_item_2,
+            android.R.id.text1,
+            deviceList
+        ) {
+            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                val view = super.getView(position, convertView, parent)
+                val text1 = view.findViewById<TextView>(android.R.id.text1)
+                val text2 = view.findViewById<TextView>(android.R.id.text2)
+
+                val item = getItem(position)
+                if (item != null) {
+                    text1.text = "${item.name} (${item.rssi} dBm)"
+                    val hex = item.manufacturerData.joinToString("") { "%02X".format(it) }
+                    text2.text = "MAC: ${item.address}\nID: ${item.manufacturerId} | Data: $hex"
+                }
+                return view
+            }
+        }
+        lvDevices.adapter = listAdapter
+
+        // Muat data lama secara automatik jika pernah disimpan
+        muatDataTersimpan()
+
+        lvDevices.setOnItemClickListener { _, _, position, _ ->
+            val item = deviceList[position]
+            selectedTarget = item
+            hentiImbas()
+
+            simpanDataTarget(item)
+
+            val hexData = item.manufacturerData.joinToString("") { "%02X".format(it) }
+            tvStatus.text = "DIPILIH & DISIMPAN:\nNama: ${item.name}\nMAC: ${item.address}\nID: ${item.manufacturerId}\nHex: $hexData\n\n(Tersimpan! Boleh terus tekan '2. Pancar Klon')"
+            Toast.makeText(this, "${item.name} disimpan ke memori telefon!", Toast.LENGTH_SHORT).show()
+        }
+
+        semakKebenaran()
+
+        btnScan.setOnClickListener {
+            if (isScanning) {
+                hentiImbas()
+            } else {
+                mulaImbas()
+            }
+        }
+
+        btnBroadcast.setOnClickListener {
+            mulaPancar()
+        }
+
+        btnStopBroadcast.setOnClickListener {
+            hentiPancar()
+        }
+    }
+
+    // --- FUNGSI SIMPAN & MUAT PERMANENT STORAGE ---
+
+    private fun simpanDataTarget(target: BleTarget) {
+        val hex = target.manufacturerData.joinToString("") { "%02X".format(it) }
+        sharedPreferences.edit()
+            .putString("SAVED_NAME", target.name)
+            .putString("SAVED_MAC", target.address)
+            .putInt("SAVED_MAN_ID", target.manufacturerId)
+            .putString("SAVED_HEX", hex)
+            .apply()
+    }
+
+    private fun muatDataTersimpan() {
+        val name = sharedPreferences.getString("SAVED_NAME", null)
+        val mac = sharedPreferences.getString("SAVED_MAC", null)
+        val manId = sharedPreferences.getInt("SAVED_MAN_ID", -1)
+        val hex = sharedPreferences.getString("SAVED_HEX", null)
+
+        if (name != null && hex != null) {
+            val payload = hexToByteArray(hex)
+            selectedTarget = BleTarget(name, mac ?: "Alamat Disimpan", manId, payload, 0)
+            tvStatus.text = "MEMORI TERAKHIR DIMUATKAN:\nNama: $name\nMAC: $mac\nID: $manId\nHex: $hex\n\n(Sedia dipancar! Tekan butang '2. Pancar Klon')"
+        }
+    }
+
+    private fun hexToByteArray(hex: String): ByteArray {
+        val cleanHex = if (hex.length % 2 != 0) hex.dropLast(1) else hex
+        val result = ByteArray(cleanHex.length / 2)
+        for (i in cleanHex.indices step 2) {
+            result[i / 2] = cleanHex.substring(i, i + 2).toInt(16).toByte()
+        }
+        return result
     }
 
     // --- LOGIK PENGECAMAN NAMA & VENDOR ---
@@ -148,7 +255,7 @@ class MainActivity : AppCompatActivity() {
             val length = bytes[index].toInt() and 0xFF
             if (length == 0 || index + length >= bytes.size) break
             val type = bytes[index + 1].toInt() and 0xFF
-            if (type == 0x08 || type == 0x09) { // 0x08/0x09 adalah standard Local Name BLE
+            if (type == 0x08 || type == 0x09) {
                 val nameBytes = bytes.copyOfRange(index + 2, index + 1 + length)
                 return String(nameBytes, Charsets.UTF_8).trim()
             }
@@ -158,19 +265,16 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun tentukanNamaPeranti(record: ScanRecord, rawDeviceName: String?, manId: Int, payload: ByteArray): String {
-        // 1. Ambil nama rasmi jika ada
         val officialName = record.deviceName ?: rawDeviceName
         if (!officialName.isNullOrBlank() && !officialName.contains("Tanpa Nama", true)) {
             return officialName
         }
 
-        // 2. Cari dalam paket iklan AD mentah
         val rawName = cariNamaDalamRawBytes(record.bytes)
         if (!rawName.isNullOrBlank()) {
             return rawName
         }
 
-        // 3. Cari teks ASCII dalam payload data (cth: nama laptop 'DESKTOP-XXX')
         val ascii = ekstrakTeksAscii(payload)
         val namaSyarikat = kenalpastiSyarikat(manId)
 
@@ -178,7 +282,6 @@ class MainActivity : AppCompatActivity() {
             return "$namaSyarikat ($ascii)"
         }
 
-        // 4. Jika tiada teks langsung, sekurang-kurangnya guna jenama/vendor
         return "Peranti $namaSyarikat"
     }
 
@@ -190,70 +293,6 @@ class MainActivity : AppCompatActivity() {
         val allGranted = permissions.entries.all { it.value }
         if (!allGranted) {
             Toast.makeText(this, "Kebenaran Bluetooth & Lokasi diperlukan!", Toast.LENGTH_LONG).show()
-        }
-    }
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
-
-        tvStatus = findViewById(R.id.tvStatus)
-        btnScan = findViewById(R.id.btnScan)
-        btnBroadcast = findViewById(R.id.btnBroadcast)
-        btnStopBroadcast = findViewById(R.id.btnStopBroadcast)
-        lvDevices = findViewById(R.id.lvDevices)
-
-        val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
-        bluetoothAdapter = bluetoothManager.adapter
-
-        listAdapter = object : ArrayAdapter<BleTarget>(
-            this,
-            android.R.layout.simple_list_item_2,
-            android.R.id.text1,
-            deviceList
-        ) {
-            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
-                val view = super.getView(position, convertView, parent)
-                val text1 = view.findViewById<TextView>(android.R.id.text1)
-                val text2 = view.findViewById<TextView>(android.R.id.text2)
-
-                val item = getItem(position)
-                if (item != null) {
-                    text1.text = "${item.name} (${item.rssi} dBm)"
-                    val hex = item.manufacturerData.joinToString("") { "%02X".format(it) }
-                    text2.text = "MAC: ${item.address}\nID: ${item.manufacturerId} | Data: $hex"
-                }
-                return view
-            }
-        }
-        lvDevices.adapter = listAdapter
-
-        lvDevices.setOnItemClickListener { _, _, position, _ ->
-            val item = deviceList[position]
-            selectedTarget = item
-            hentiImbas()
-
-            val hexData = item.manufacturerData.joinToString("") { "%02X".format(it) }
-            tvStatus.text = "DIPILIH:\nNama: ${item.name}\nMAC: ${item.address}\nID: ${item.manufacturerId}\nHex: $hexData\n\n(Tekan '2. Pancar Klon' untuk siarkan)"
-            Toast.makeText(this, "${item.name} dipilih!", Toast.LENGTH_SHORT).show()
-        }
-
-        semakKebenaran()
-
-        btnScan.setOnClickListener {
-            if (isScanning) {
-                hentiImbas()
-            } else {
-                mulaImbas()
-            }
-        }
-
-        btnBroadcast.setOnClickListener {
-            mulaPancar()
-        }
-
-        btnStopBroadcast.setOnClickListener {
-            hentiPancar()
         }
     }
 
@@ -296,11 +335,10 @@ class MainActivity : AppCompatActivity() {
 
         deviceList.clear()
         listAdapter.notifyDataSetChanged()
-        selectedTarget = null
 
         isScanning = true
         btnScan.text = "Henti Imbas"
-        tvStatus.text = "Sedang mengimbas... Ketik peranti untuk salin."
+        tvStatus.text = "Sedang mengimbas... Ketik peranti untuk salin & simpan."
 
         val settings = ScanSettings.Builder()
             .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
@@ -322,7 +360,7 @@ class MainActivity : AppCompatActivity() {
     private fun mulaPancar() {
         val target = selectedTarget
         if (target == null) {
-            tvStatus.text = "Pilih satu peranti dalam senarai dahulu!"
+            tvStatus.text = "Tiada signal dipilih atau disimpan! Sila imbas dahulu."
             return
         }
 
@@ -352,7 +390,7 @@ class MainActivity : AppCompatActivity() {
             dataBuilder.addManufacturerData(target.manufacturerId, payload)
         }
 
-        tvStatus.text = "Memancarkan klon: ${target.name}..."
+        tvStatus.text = "Memancarkan klon tersimpan: ${target.name}..."
         bleAdvertiser?.startAdvertising(settings, dataBuilder.build(), advertiseCallback)
     }
 
