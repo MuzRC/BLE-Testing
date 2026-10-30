@@ -16,7 +16,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 
-// Model data untuk simpan maklumat setiap peranti BLE
 data class BleTarget(
     val name: String,
     val address: String,
@@ -67,11 +66,10 @@ class MainActivity : AppCompatActivity() {
             val record = result?.scanRecord ?: return
             val device = result.device ?: return
 
-            val devName = record.deviceName ?: device.name ?: "Peranti Tanpa Nama"
             val devAddress = device.address ?: return
             val manData = record.manufacturerSpecificData
 
-            var mId = 0x004C // Default fallback ID
+            var mId = -1
             var payload: ByteArray? = null
 
             if (manData != null && manData.size() > 0) {
@@ -80,12 +78,14 @@ class MainActivity : AppCompatActivity() {
             } else {
                 val rawBytes = record.bytes
                 if (rawBytes != null && rawBytes.isNotEmpty()) {
-                    payload = rawBytes.take(20).toByteArray()
+                    payload = rawBytes.take(24).toByteArray()
                 }
             }
 
             if (payload != null) {
-                val target = BleTarget(devName, devAddress, mId, payload, result.rssi)
+                // Tentukan nama pintar berdasarkan data mentah
+                val finalName = tentukanNamaPeranti(record, device.name, mId, payload)
+                val target = BleTarget(finalName, devAddress, mId, payload, result.rssi)
 
                 runOnUiThread {
                     val existingIndex = deviceList.indexOfFirst { it.address == devAddress }
@@ -106,6 +106,83 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
+
+    // --- LOGIK PENGECAMAN NAMA & VENDOR ---
+
+    private fun kenalpastiSyarikat(id: Int): String {
+        return when (id) {
+            0x0006 -> "Microsoft"
+            0x004C -> "Apple"
+            0x0075 -> "Samsung"
+            0x000F -> "Broadcom"
+            0x0059 -> "Nordic Semiconductor"
+            0x00E0 -> "Google"
+            0x0157 -> "Anker"
+            0x038F -> "Xiaomi"
+            0x07D0 -> "Tuya Smart"
+            -1 -> "Generic BLE"
+            else -> "Vendor #$id"
+        }
+    }
+
+    private fun ekstrakTeksAscii(bytes: ByteArray): String? {
+        var currentChunk = StringBuilder()
+        for (b in bytes) {
+            val c = b.toInt().toChar()
+            if (c in '0'..'9' || c in 'A'..'Z' || c in 'a'..'z' || c == '-' || c == '_') {
+                currentChunk.append(c)
+            } else {
+                if (currentChunk.length >= 4) {
+                    return currentChunk.toString()
+                }
+                currentChunk = StringBuilder()
+            }
+        }
+        return if (currentChunk.length >= 4) currentChunk.toString() else null
+    }
+
+    private fun cariNamaDalamRawBytes(bytes: ByteArray?): String? {
+        if (bytes == null) return null
+        var index = 0
+        while (index < bytes.size) {
+            val length = bytes[index].toInt() and 0xFF
+            if (length == 0 || index + length >= bytes.size) break
+            val type = bytes[index + 1].toInt() and 0xFF
+            if (type == 0x08 || type == 0x09) { // 0x08/0x09 adalah standard Local Name BLE
+                val nameBytes = bytes.copyOfRange(index + 2, index + 1 + length)
+                return String(nameBytes, Charsets.UTF_8).trim()
+            }
+            index += length + 1
+        }
+        return null
+    }
+
+    private fun tentukanNamaPeranti(record: ScanRecord, rawDeviceName: String?, manId: Int, payload: ByteArray): String {
+        // 1. Ambil nama rasmi jika ada
+        val officialName = record.deviceName ?: rawDeviceName
+        if (!officialName.isNullOrBlank() && !officialName.contains("Tanpa Nama", true)) {
+            return officialName
+        }
+
+        // 2. Cari dalam paket iklan AD mentah
+        val rawName = cariNamaDalamRawBytes(record.bytes)
+        if (!rawName.isNullOrBlank()) {
+            return rawName
+        }
+
+        // 3. Cari teks ASCII dalam payload data (cth: nama laptop 'DESKTOP-XXX')
+        val ascii = ekstrakTeksAscii(payload)
+        val namaSyarikat = kenalpastiSyarikat(manId)
+
+        if (!ascii.isNullOrBlank()) {
+            return "$namaSyarikat ($ascii)"
+        }
+
+        // 4. Jika tiada teks langsung, sekurang-kurangnya guna jenama/vendor
+        return "Peranti $namaSyarikat"
+    }
+
+    // --- PENGURUSAN AKTIVITI & PERMISSIONS ---
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -129,7 +206,6 @@ class MainActivity : AppCompatActivity() {
         val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
         bluetoothAdapter = bluetoothManager.adapter
 
-        // Adapter untuk ListView (paparan nama & data hex)
         listAdapter = object : ArrayAdapter<BleTarget>(
             this,
             android.R.layout.simple_list_item_2,
@@ -152,15 +228,14 @@ class MainActivity : AppCompatActivity() {
         }
         lvDevices.adapter = listAdapter
 
-        // Tindakan bila pengguna ketik mana-mana peranti dalam senarai
         lvDevices.setOnItemClickListener { _, _, position, _ ->
             val item = deviceList[position]
             selectedTarget = item
             hentiImbas()
 
             val hexData = item.manufacturerData.joinToString("") { "%02X".format(it) }
-            tvStatus.text = "DIPILIH:\nNama: ${item.name}\nMAC: ${item.address}\nID: ${item.manufacturerId}\nHex: $hexData\n\n(Sedia dipancar! Tekan butang '2. Pancar Klon')"
-            Toast.makeText(this, "Peranti ${item.name} dipilih!", Toast.LENGTH_SHORT).show()
+            tvStatus.text = "DIPILIH:\nNama: ${item.name}\nMAC: ${item.address}\nID: ${item.manufacturerId}\nHex: $hexData\n\n(Tekan '2. Pancar Klon' untuk siarkan)"
+            Toast.makeText(this, "${item.name} dipilih!", Toast.LENGTH_SHORT).show()
         }
 
         semakKebenaran()
@@ -225,7 +300,7 @@ class MainActivity : AppCompatActivity() {
 
         isScanning = true
         btnScan.text = "Henti Imbas"
-        tvStatus.text = "Sedang mengimbas... Ketik mana-mana peranti di bawah untuk menyalin."
+        tvStatus.text = "Sedang mengimbas... Ketik peranti untuk salin."
 
         val settings = ScanSettings.Builder()
             .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
@@ -247,13 +322,13 @@ class MainActivity : AppCompatActivity() {
     private fun mulaPancar() {
         val target = selectedTarget
         if (target == null) {
-            tvStatus.text = "Tiada signal dipilih! Sila ketik satu peranti dalam senarai dahulu."
+            tvStatus.text = "Pilih satu peranti dalam senarai dahulu!"
             return
         }
 
         bleAdvertiser = bluetoothAdapter?.bluetoothLeAdvertiser
         if (bleAdvertiser == null || !bluetoothAdapter!!.isMultipleAdvertisementSupported) {
-            tvStatus.text = "Telefon ini tidak menyokong mod pemancar BLE (cip radio terhad)."
+            tvStatus.text = "Telefon ini tidak menyokong penyiaran BLE."
             return
         }
 
@@ -263,21 +338,22 @@ class MainActivity : AppCompatActivity() {
             .setConnectable(false)
             .build()
 
-        // Hadkan data iklan kepada maksima 24 bait agar tidak melebihi had 31 bait BLE
         val payload = if (target.manufacturerData.size > 24) {
             target.manufacturerData.copyOfRange(0, 24)
         } else {
             target.manufacturerData
         }
 
-        val data = AdvertiseData.Builder()
+        val dataBuilder = AdvertiseData.Builder()
             .setIncludeDeviceName(false)
             .setIncludeTxPowerLevel(false)
-            .addManufacturerData(target.manufacturerId, payload)
-            .build()
 
-        tvStatus.text = "Memancarkan klon: ${target.name} (${target.address})..."
-        bleAdvertiser?.startAdvertising(settings, data, advertiseCallback)
+        if (target.manufacturerId != -1) {
+            dataBuilder.addManufacturerData(target.manufacturerId, payload)
+        }
+
+        tvStatus.text = "Memancarkan klon: ${target.name}..."
+        bleAdvertiser?.startAdvertising(settings, dataBuilder.build(), advertiseCallback)
     }
 
     @SuppressLint("MissingPermission")
