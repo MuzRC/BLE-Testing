@@ -243,7 +243,6 @@ class MainActivity : AppCompatActivity() {
             hentiPancar()
         }
     }
-
     // --- PENGURUSAN STORAN KEKAL (SHAREDPREFERENCES) ---
 
     private fun simpanDataTarget(target: BleTarget) {
