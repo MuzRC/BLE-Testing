@@ -44,19 +44,48 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var sharedPreferences: SharedPreferences
 
-    // Callback pemancar klon
+    // Callback pemancar klon dengan paparan metrik kekuatan signal
     private val advertiseCallback = object : AdvertiseCallback() {
         override fun onStartSuccess(settingsInEffect: AdvertiseSettings?) {
             super.onStartSuccess(settingsInEffect)
             runOnUiThread {
-                tvStatus.text = "Signal klon [${selectedTarget?.name}] sedang dipancarkan secara aktif!"
+                val hex = selectedTarget?.manufacturerData?.joinToString("") { "%02X".format(it) } ?: "TIADA"
+                val txLabel = when (settingsInEffect?.txPowerLevel) {
+                    AdvertiseSettings.ADVERTISE_TX_POWER_HIGH -> "HIGH (+1 hingga +4 dBm)"
+                    AdvertiseSettings.ADVERTISE_TX_POWER_MEDIUM -> "MEDIUM (-7 dBm)"
+                    AdvertiseSettings.ADVERTISE_TX_POWER_LOW -> "LOW (-15 dBm)"
+                    AdvertiseSettings.ADVERTISE_TX_POWER_ULTRA_LOW -> "ULTRA LOW (-21 dBm)"
+                    else -> "MAKSIMUM (+1 hingga +4 dBm)"
+                }
+
+                tvStatus.text = """
+                    ● SIGNAL SEDANG DIPANCARKAN SECARA AKTIF
+                    
+                    Peranti: ${selectedTarget?.name}
+                    MAC Asal: ${selectedTarget?.address}
+                    ID Vendor: ${selectedTarget?.manufacturerId}
+                    Kuasa TX: $txLabel [Paras Penuh Perkakasan]
+                    Mod Latensi: LOW_LATENCY (Pancaran Berterusan)
+                    Anggaran Liputan: 10 - 20 meter (kawasan terbuka)
+                    
+                    Payload (${selectedTarget?.manufacturerData?.size ?: 0} Bytes):
+                    $hex
+                """.trimIndent()
             }
         }
 
         override fun onStartFailure(errorCode: Int) {
             super.onStartFailure(errorCode)
             runOnUiThread {
-                tvStatus.text = "Gagal memancar. Ralat kod: $errorCode"
+                val ralatDesc = when (errorCode) {
+                    ADVERTISE_FAILED_DATA_TOO_LARGE -> "Data melebihi had 31 bait BLE!"
+                    ADVERTISE_FAILED_TOO_MANY_ADVERTISERS -> "Terlalu banyak pemancar aktif dalam sistem!"
+                    ADVERTISE_FAILED_ALREADY_STARTED -> "Pemancar sudah sedia aktif."
+                    ADVERTISE_FAILED_INTERNAL_ERROR -> "Ralat pemacu Bluetooth dalaman telefon."
+                    ADVERTISE_FAILED_FEATURE_UNSUPPORTED -> "Cip radio telefon tidak menyokong fungsi BLE Advertising."
+                    else -> "Ralat kod tidak diketahui: $errorCode"
+                }
+                tvStatus.text = "Gagal memancar klon!\nPunca: $ralatDesc"
             }
         }
     }
@@ -104,7 +133,7 @@ class MainActivity : AppCompatActivity() {
         override fun onScanFailed(errorCode: Int) {
             super.onScanFailed(errorCode)
             runOnUiThread {
-                tvStatus.text = "Imbasan gagal. Ralat kod: $errorCode"
+                tvStatus.text = "Imbasan gagal dijalankan. Ralat kod: $errorCode"
             }
         }
     }
@@ -124,6 +153,7 @@ class MainActivity : AppCompatActivity() {
         val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
         bluetoothAdapter = bluetoothManager.adapter
 
+        // Tetapkan adapter senarai
         listAdapter = object : ArrayAdapter<BleTarget>(
             this,
             android.R.layout.simple_list_item_2,
@@ -146,7 +176,7 @@ class MainActivity : AppCompatActivity() {
         }
         lvDevices.adapter = listAdapter
 
-        // Muat data lama secara automatik jika pernah disimpan
+        // Muat profil terakhir yang disimpan secara automatik
         muatDataTersimpan()
 
         lvDevices.setOnItemClickListener { _, _, position, _ ->
@@ -157,8 +187,17 @@ class MainActivity : AppCompatActivity() {
             simpanDataTarget(item)
 
             val hexData = item.manufacturerData.joinToString("") { "%02X".format(it) }
-            tvStatus.text = "DIPILIH & DISIMPAN:\nNama: ${item.name}\nMAC: ${item.address}\nID: ${item.manufacturerId}\nHex: $hexData\n\n(Tersimpan! Boleh terus tekan '2. Pancar Klon')"
-            Toast.makeText(this, "${item.name} disimpan ke memori telefon!", Toast.LENGTH_SHORT).show()
+            tvStatus.text = """
+                PROFIL DISIMPAN KE STORAN KEKAL:
+                
+                Peranti: ${item.name}
+                MAC: ${item.address}
+                ID: ${item.manufacturerId}
+                Data Hex: $hexData
+                
+                (Sedia dipancar bila-bila masa! Tekan '2. Pancar Klon')
+            """.trimIndent()
+            Toast.makeText(this, "${item.name} telah disimpan!", Toast.LENGTH_SHORT).show()
         }
 
         semakKebenaran()
@@ -180,7 +219,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // --- FUNGSI SIMPAN & MUAT PERMANENT STORAGE ---
+    // --- PENGURUSAN STORAN KEKAL (SHAREDPREFERENCES) ---
 
     private fun simpanDataTarget(target: BleTarget) {
         val hex = target.manufacturerData.joinToString("") { "%02X".format(it) }
@@ -201,7 +240,16 @@ class MainActivity : AppCompatActivity() {
         if (name != null && hex != null) {
             val payload = hexToByteArray(hex)
             selectedTarget = BleTarget(name, mac ?: "Alamat Disimpan", manId, payload, 0)
-            tvStatus.text = "MEMORI TERAKHIR DIMUATKAN:\nNama: $name\nMAC: $mac\nID: $manId\nHex: $hex\n\n(Sedia dipancar! Tekan butang '2. Pancar Klon')"
+            tvStatus.text = """
+                DATA TERSIMPAN DIMUATKAN SEMULA:
+                
+                Peranti: $name
+                MAC Asal: $mac
+                ID Vendor: $manId
+                Data Hex: $hex
+                
+                (Sedia dipancar tanpa perlu imbas! Tekan butang '2. Pancar Klon')
+            """.trimIndent()
         }
     }
 
@@ -214,7 +262,7 @@ class MainActivity : AppCompatActivity() {
         return result
     }
 
-    // --- LOGIK PENGECAMAN NAMA & VENDOR ---
+    // --- LOGIK PENGECAMAN JENAMA & EKSTRAK ASCII ---
 
     private fun kenalpastiSyarikat(id: Int): String {
         return when (id) {
@@ -285,7 +333,7 @@ class MainActivity : AppCompatActivity() {
         return "Peranti $namaSyarikat"
     }
 
-    // --- PENGURUSAN AKTIVITI & PERMISSIONS ---
+    // --- PENGURUSAN PERMISSIONS & OPERASI BLE ---
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -338,7 +386,7 @@ class MainActivity : AppCompatActivity() {
 
         isScanning = true
         btnScan.text = "Henti Imbas"
-        tvStatus.text = "Sedang mengimbas... Ketik peranti untuk salin & simpan."
+        tvStatus.text = "Sedang mengimbas di udara...\nKetik mana-mana peranti untuk simpan & pancar semula."
 
         val settings = ScanSettings.Builder()
             .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
@@ -360,16 +408,17 @@ class MainActivity : AppCompatActivity() {
     private fun mulaPancar() {
         val target = selectedTarget
         if (target == null) {
-            tvStatus.text = "Tiada signal dipilih atau disimpan! Sila imbas dahulu."
+            tvStatus.text = "Tiada signal dipilih atau tersimpan! Sila imbas dahulu."
             return
         }
 
         bleAdvertiser = bluetoothAdapter?.bluetoothLeAdvertiser
         if (bleAdvertiser == null || !bluetoothAdapter!!.isMultipleAdvertisementSupported) {
-            tvStatus.text = "Telefon ini tidak menyokong penyiaran BLE."
+            tvStatus.text = "Telefon ini tidak menyokong fungsi pemancar BLE (cip terhad)."
             return
         }
 
+        // Konfigurasi kuasa maksimum perkakasan
         val settings = AdvertiseSettings.Builder()
             .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
             .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
@@ -390,14 +439,14 @@ class MainActivity : AppCompatActivity() {
             dataBuilder.addManufacturerData(target.manufacturerId, payload)
         }
 
-        tvStatus.text = "Memancarkan klon tersimpan: ${target.name}..."
+        tvStatus.text = "Menghantar arahan pemancar ke cip radio telefon..."
         bleAdvertiser?.startAdvertising(settings, dataBuilder.build(), advertiseCallback)
     }
 
     @SuppressLint("MissingPermission")
     private fun hentiPancar() {
         bleAdvertiser?.stopAdvertising(advertiseCallback)
-        tvStatus.text = "Pancaran klon telah dihentikan."
+        tvStatus.text = "Pancaran klon telah dihentikan sepenuhnya."
     }
 
     override fun onDestroy() {
