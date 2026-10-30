@@ -6,10 +6,15 @@ import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.bluetooth.le.*
 import android.content.Context
+import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
+import android.location.LocationManager
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.provider.Settings
 import android.view.View
 import android.view.ViewGroup
 import android.widget.*
@@ -44,6 +49,14 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var sharedPreferences: SharedPreferences
 
+    // Throttling UI untuk kawal bebanan render bila terlalu banyak isyarat BLE masuk
+    private val updateHandler = Handler(Looper.getMainLooper())
+    private var pendingUiUpdate = false
+    private val uiUpdateRunnable = Runnable {
+        listAdapter.notifyDataSetChanged()
+        pendingUiUpdate = false
+    }
+
     // Callback pemancar klon dengan paparan metrik kekuatan signal
     private val advertiseCallback = object : AdvertiseCallback() {
         override fun onStartSuccess(settingsInEffect: AdvertiseSettings?) {
@@ -58,12 +71,18 @@ class MainActivity : AppCompatActivity() {
                     else -> "MAKSIMUM (+1 hingga +4 dBm)"
                 }
 
+                val vendorLabel = if (selectedTarget?.manufacturerId != -1) {
+                    "${selectedTarget?.manufacturerId}"
+                } else {
+                    "0xFFFF (Fallback Data Mentah)"
+                }
+
                 tvStatus.text = """
                     ● SIGNAL SEDANG DIPANCARKAN SECARA AKTIF
                     
-                    Peranti: ${selectedTarget?.name}
-                    MAC Asal: ${selectedTarget?.address}
-                    ID Vendor: ${selectedTarget?.manufacturerId}
+                    Peranti Sumber: ${selectedTarget?.name}
+                    MAC Sumber: ${selectedTarget?.address} (Rujuk data; pemancar guna RPA Android)
+                    ID Vendor: $vendorLabel
                     Kuasa TX: $txLabel [Paras Penuh Perkakasan]
                     Mod Latensi: LOW_LATENCY (Pancaran Berterusan)
                     Anggaran Liputan: 10 - 20 meter (kawasan terbuka)
@@ -118,14 +137,20 @@ class MainActivity : AppCompatActivity() {
                 val finalName = tentukanNamaPeranti(record, device.name, mId, payload)
                 val target = BleTarget(finalName, devAddress, mId, payload, result.rssi)
 
-                runOnUiThread {
+                // Thread-safety bila data list diubah serentak
+                synchronized(deviceList) {
                     val existingIndex = deviceList.indexOfFirst { it.address == devAddress }
                     if (existingIndex != -1) {
                         deviceList[existingIndex] = target
                     } else {
                         deviceList.add(target)
                     }
-                    listAdapter.notifyDataSetChanged()
+                }
+
+                // Batch update UI setiap 500ms supaya skrin tidak jem
+                if (!pendingUiUpdate) {
+                    pendingUiUpdate = true
+                    updateHandler.postDelayed(uiUpdateRunnable, 500)
                 }
             }
         }
@@ -180,7 +205,7 @@ class MainActivity : AppCompatActivity() {
         muatDataTersimpan()
 
         lvDevices.setOnItemClickListener { _, _, position, _ ->
-            val item = deviceList[position]
+            val item = synchronized(deviceList) { deviceList[position] }
             selectedTarget = item
             hentiImbas()
 
@@ -191,11 +216,11 @@ class MainActivity : AppCompatActivity() {
                 PROFIL DISIMPAN KE STORAN KEKAL:
                 
                 Peranti: ${item.name}
-                MAC: ${item.address}
+                MAC Sumber: ${item.address}
                 ID: ${item.manufacturerId}
                 Data Hex: $hexData
                 
-                (Sedia dipancar bila-bila masa! Tekan '2. Pancar Klon')
+                (Sedia dipancar bila-bila masa! Tekan butang 'Pancar')
             """.trimIndent()
             Toast.makeText(this, "${item.name} telah disimpan!", Toast.LENGTH_SHORT).show()
         }
@@ -244,11 +269,11 @@ class MainActivity : AppCompatActivity() {
                 DATA TERSIMPAN DIMUATKAN SEMULA:
                 
                 Peranti: $name
-                MAC Asal: $mac
+                MAC Sumber: $mac
                 ID Vendor: $manId
                 Data Hex: $hex
                 
-                (Sedia dipancar tanpa perlu imbas! Tekan butang '2. Pancar Klon')
+                (Sedia dipancar tanpa perlu imbas! Tekan butang 'Pancar')
             """.trimIndent()
         }
     }
@@ -344,6 +369,16 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun adaKebenaranBle(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_ADVERTISE) == PackageManager.PERMISSION_GRANTED &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
+        } else {
+            ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        }
+    }
+
     private fun semakKebenaran() {
         val permissionsToRequest = mutableListOf<String>()
 
@@ -357,10 +392,10 @@ class MainActivity : AppCompatActivity() {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
                 permissionsToRequest.add(Manifest.permission.BLUETOOTH_CONNECT)
             }
-        }
-
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            permissionsToRequest.add(Manifest.permission.ACCESS_FINE_LOCATION)
+        } else {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                permissionsToRequest.add(Manifest.permission.ACCESS_FINE_LOCATION)
+            }
         }
 
         if (permissionsToRequest.isNotEmpty()) {
@@ -368,11 +403,36 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun isLocationServiceEnabled(): Boolean {
+        val locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            locationManager.isLocationEnabled
+        } else {
+            locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) ||
+            locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
+        }
+    }
+
     @SuppressLint("MissingPermission")
     private fun mulaImbas() {
+        if (!adaKebenaranBle()) {
+            semakKebenaran()
+            tvStatus.text = "Kebenaran belum lengkap. Sila benarkan akses."
+            return
+        }
+
         if (bluetoothAdapter == null || !bluetoothAdapter!!.isEnabled) {
             tvStatus.text = "Sila hidupkan Bluetooth telefon dahulu."
             return
+        }
+
+        // Semak servis GPS untuk peranti Android 11 ke bawah
+        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.R) {
+            if (!isLocationServiceEnabled()) {
+                tvStatus.text = "Sila aktifkan GPS/Lokasi di bar notifikasi untuk mengimbas BLE!"
+                startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
+                return
+            }
         }
 
         bleScanner = bluetoothAdapter?.bluetoothLeScanner
@@ -381,7 +441,9 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        deviceList.clear()
+        synchronized(deviceList) {
+            deviceList.clear()
+        }
         listAdapter.notifyDataSetChanged()
 
         isScanning = true
@@ -392,23 +454,46 @@ class MainActivity : AppCompatActivity() {
             .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
             .build()
 
-        bleScanner?.startScan(emptyList(), settings, scanCallback)
-    }
-
-    @SuppressLint("MissingPermission")
-    private fun hentiImbas() {
-        if (isScanning) {
-            bleScanner?.stopScan(scanCallback)
+        try {
+            bleScanner?.startScan(emptyList(), settings, scanCallback)
+        } catch (e: SecurityException) {
+            tvStatus.text = "Ralat kebenaran imbas: ${e.localizedMessage}"
             isScanning = false
             btnScan.text = "1. Mula Imbas Signal"
         }
     }
 
     @SuppressLint("MissingPermission")
+    private fun hentiImbas() {
+        if (isScanning) {
+            try {
+                bleScanner?.stopScan(scanCallback)
+            } catch (e: SecurityException) {
+                // Abaikan jika tiada izin semasa tutup
+            }
+            isScanning = false
+            btnScan.text = "1. Mula Imbas Signal"
+        }
+        updateHandler.removeCallbacks(uiUpdateRunnable)
+        pendingUiUpdate = false
+    }
+
+    @SuppressLint("MissingPermission")
     private fun mulaPancar() {
+        if (!adaKebenaranBle()) {
+            semakKebenaran()
+            tvStatus.text = "Kebenaran Bluetooth belum lengkap untuk memancar."
+            return
+        }
+
         val target = selectedTarget
         if (target == null) {
             tvStatus.text = "Tiada signal dipilih atau tersimpan! Sila imbas dahulu."
+            return
+        }
+
+        if (bluetoothAdapter == null || !bluetoothAdapter!!.isEnabled) {
+            tvStatus.text = "Sila hidupkan Bluetooth telefon dahulu."
             return
         }
 
@@ -418,7 +503,6 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        // Konfigurasi kuasa maksimum perkakasan
         val settings = AdvertiseSettings.Builder()
             .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
             .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
@@ -431,21 +515,29 @@ class MainActivity : AppCompatActivity() {
             target.manufacturerData
         }
 
+        // Jika tiada Company ID rasmi (-1), guna rizab eksperimen 0xFFFF supaya paket tidak kosong
+        val effectiveManId = if (target.manufacturerId != -1) target.manufacturerId else 0xFFFF
+
         val dataBuilder = AdvertiseData.Builder()
             .setIncludeDeviceName(false)
             .setIncludeTxPowerLevel(false)
-
-        if (target.manufacturerId != -1) {
-            dataBuilder.addManufacturerData(target.manufacturerId, payload)
-        }
+            .addManufacturerData(effectiveManId, payload)
 
         tvStatus.text = "Menghantar arahan pemancar ke cip radio telefon..."
-        bleAdvertiser?.startAdvertising(settings, dataBuilder.build(), advertiseCallback)
+        try {
+            bleAdvertiser?.startAdvertising(settings, dataBuilder.build(), advertiseCallback)
+        } catch (e: SecurityException) {
+            tvStatus.text = "Ralat kebenaran memancar: ${e.localizedMessage}"
+        }
     }
 
     @SuppressLint("MissingPermission")
     private fun hentiPancar() {
-        bleAdvertiser?.stopAdvertising(advertiseCallback)
+        try {
+            bleAdvertiser?.stopAdvertising(advertiseCallback)
+        } catch (e: SecurityException) {
+            // Abaikan ralat semasa menutup pemancar
+        }
         tvStatus.text = "Pancaran klon telah dihentikan sepenuhnya."
     }
 
