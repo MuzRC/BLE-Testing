@@ -27,6 +27,7 @@ import com.muz.bletesting.adapter.BleDeviceAdapter
 import com.muz.bletesting.ble.BleAdvertiserManager
 import com.muz.bletesting.ble.BleScannerManager
 import com.muz.bletesting.dialog.BookmarkDialog
+import com.muz.bletesting.dialog.BurstConfigDialog
 import com.muz.bletesting.dialog.ManualInjectDialog
 import com.muz.bletesting.dialog.PacketDiffDialog
 import com.muz.bletesting.dialog.RssiTrackerDialog
@@ -199,9 +200,25 @@ class MainActivity : AppCompatActivity() {
             if (scannerManager.isScanning) hentikanImbasan() else mulakanImbasan()
         }
 
+        // 1. Ketik Biasa: Mula Pancar Klon
         btnBroadcast.setOnClickListener {
             animasiButang(it)
             mulakanPancaran()
+        }
+
+        // 2. Tekan Lama: Buka Dialog Konfigurasi Mod Burst
+        btnBroadcast.setOnLongClickListener {
+            BurstConfigDialog.tunjuk(
+                context = this,
+                isBurstActive = advertiserManager.isBurstMode,
+                currentOnSec = advertiserManager.burstOnSeconds,
+                currentOffSec = advertiserManager.burstOffSeconds
+            ) { isEnabled, onSec, offSec ->
+                advertiserManager.isBurstMode = isEnabled
+                advertiserManager.burstOnSeconds = onSec
+                advertiserManager.burstOffSeconds = offSec
+            }
+            true
         }
 
         btnStopBroadcast.setOnClickListener {
@@ -266,6 +283,7 @@ class MainActivity : AppCompatActivity() {
             
             (Sedia untuk dipancar! Tekan 'Pancar')
             [Ketik: Buka Radar | Tekan Lama: Hex Diff]
+            [Tips: Tekan lama butang Pancar untuk Mod Burst]
         """.trimIndent()
     }
 
@@ -361,11 +379,18 @@ class MainActivity : AppCompatActivity() {
                         "Format: Raw Fallback (0xFFFF)"
                     }
 
+                    val infoMod = if (advertiserManager.isBurstMode) {
+                        "Mod: BURST BERKALA (${advertiserManager.burstOnSeconds}s ON / ${advertiserManager.burstOffSeconds}s OFF)"
+                    } else {
+                        "Mod: PANCARAN BERTERUSAN (Continuous)"
+                    }
+
                     tvStatus.text = """
                         ● SIGNAL SEDANG DIPANCARKAN SECARA TEPAT
                         Peranti: ${target?.name}
                         MAC Sumber: ${target?.address}
                         $infoJenis
+                        $infoMod
                         Kuasa TX: $txLabel
                         Payload ($payloadSize Bytes):
                         $hex
@@ -376,6 +401,12 @@ class MainActivity : AppCompatActivity() {
                 runOnUiThread {
                     hentiDenyutanRadar()
                     tvStatus.text = errorMsg
+                }
+            },
+            onPulseStatusChange = { isPulseActive ->
+                // Denyutan visual ikut fasa rehat & pancar mod burst
+                runOnUiThread {
+                    if (isPulseActive) mulaDenyutanRadar() else hentiDenyutanRadar()
                 }
             }
         )
