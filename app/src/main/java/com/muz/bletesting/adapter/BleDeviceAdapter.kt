@@ -26,12 +26,21 @@ class BleDeviceAdapter(
         val item = getItem(position)
         if (item != null) {
             text1.text = "${item.name} (${item.rssi} dBm)"
-            val hex = BleParserUtils.byteArrayToHex(item.manufacturerData)
-            val manIdDisplay = if (item.manufacturerId != -1) item.manufacturerId.toString() else "Tiada (Raw)"
-            text2.text = "MAC: ${item.address}\nID: $manIdDisplay | Data: $hex"
+
+            if (item.manufacturerId != -1) {
+                val hex = BleParserUtils.byteArrayToHex(item.manufacturerData)
+                text2.text = "MAC: ${item.address}\nID Vendor: ${item.manufacturerId} | Data: $hex"
+            } else if (item.serviceUuid != null) {
+                val shortUuid = BleParserUtils.formatShortUuid(item.serviceUuid)
+                val hex = BleParserUtils.byteArrayToHex(item.serviceData)
+                text2.text = "MAC: ${item.address}\nService UUID: $shortUuid | Data: $hex"
+            } else {
+                val hex = BleParserUtils.byteArrayToHex(item.manufacturerData)
+                text2.text = "MAC: ${item.address}\nRaw Data: $hex"
+            }
         }
 
-        // --- ANIMASI MELUNCUR & FADE IN ---
+        // Animasi baris senarai meluncur masuk perlahan-lahan
         if (convertView == null) {
             view.alpha = 0f
             view.translationY = 30f
