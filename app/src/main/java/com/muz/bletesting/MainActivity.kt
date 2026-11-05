@@ -46,7 +46,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var listAdapter: BleDeviceAdapter
     private var selectedTarget: BleTarget? = null
 
-    // Pemegang animasi denyutan untuk kotak status
     private var pulseAnimator: ObjectAnimator? = null
 
     private val updateHandler = Handler(Looper.getMainLooper())
@@ -95,16 +94,24 @@ class MainActivity : AppCompatActivity() {
 
             storageManager.simpanTarget(item)
 
-            val hexData = BleParserUtils.byteArrayToHex(item.manufacturerData)
+            val infoJenis = if (item.manufacturerId != -1) {
+                "Jenis: Manufacturer Data (ID: ${item.manufacturerId})"
+            } else if (item.serviceUuid != null) {
+                "Jenis: Service Data (${BleParserUtils.formatShortUuid(item.serviceUuid)})"
+            } else {
+                "Jenis: Raw Data"
+            }
+
+            val hexData = storageManager.dapatkanDisplayData(item)
             tvStatus.text = """
                 PROFIL DISIMPAN KE STORAN KEKAL:
                 
                 Peranti: ${item.name}
                 MAC Sumber: ${item.address}
-                ID: ${item.manufacturerId}
+                $infoJenis
                 Data Hex: $hexData
                 
-                (Sedia dipancar bila-bila masa! Tekan butang 'Pancar')
+                (Sedia dipancar dengan struktur protokol tepat! Tekan 'Pancar')
             """.trimIndent()
             Toast.makeText(this, "${item.name} telah disimpan!", Toast.LENGTH_SHORT).show()
         }
@@ -128,8 +135,6 @@ class MainActivity : AppCompatActivity() {
             hentikanPancaran()
         }
     }
-
-    // --- FUNGSI ANIMASI UI ---
 
     private fun animasiTekanButang(view: View) {
         view.animate()
@@ -194,7 +199,9 @@ class MainActivity : AppCompatActivity() {
                 runOnUiThread {
                     mulaDenyutanRadar()
                     val target = selectedTarget
-                    val hex = target?.let { BleParserUtils.byteArrayToHex(it.manufacturerData) } ?: "TIADA"
+                    val hex = target?.let { storageManager.dapatkanDisplayData(it) } ?: "TIADA"
+                    val payloadSize = if (target?.isServiceData == true) target.serviceData.size else target?.manufacturerData?.size ?: 0
+
                     val txLabel = when (settingsInEffect?.txPowerLevel) {
                         AdvertiseSettings.ADVERTISE_TX_POWER_HIGH -> "HIGH (+1 hingga +4 dBm)"
                         AdvertiseSettings.ADVERTISE_TX_POWER_MEDIUM -> "MEDIUM (-7 dBm)"
@@ -203,23 +210,25 @@ class MainActivity : AppCompatActivity() {
                         else -> "MAKSIMUM (+1 hingga +4 dBm)"
                     }
 
-                    val vendorLabel = if (target?.manufacturerId != -1) {
-                        "${target?.manufacturerId}"
+                    val infoJenis = if (target?.manufacturerId != -1) {
+                        "Format: Manufacturer Specific (ID: ${target?.manufacturerId})"
+                    } else if (target?.serviceUuid != null) {
+                        "Format: Service Data (${BleParserUtils.formatShortUuid(target.serviceUuid)})"
                     } else {
-                        "0xFFFF (Fallback Data Mentah)"
+                        "Format: Raw Fallback (0xFFFF)"
                     }
 
                     tvStatus.text = """
-                        ● SIGNAL SEDANG DIPANCARKAN SECARA AKTIF
+                        ● SIGNAL SEDANG DIPANCARKAN SECARA TEPAT
                         
                         Peranti Sumber: ${target?.name}
-                        MAC Sumber: ${target?.address}
-                        ID Vendor: $vendorLabel
+                        MAC Sumber: ${target?.address} (Rujuk data; pemancar guna RPA Android)
+                        $infoJenis
                         Kuasa TX: $txLabel [Paras Penuh Perkakasan]
                         Mod Latensi: LOW_LATENCY (Pancaran Berterusan)
                         Anggaran Liputan: 10 - 20 meter (kawasan terbuka)
                         
-                        Payload (${target?.manufacturerData?.size ?: 0} Bytes):
+                        Payload ($payloadSize Bytes):
                         $hex
                     """.trimIndent()
                 }
@@ -237,13 +246,21 @@ class MainActivity : AppCompatActivity() {
         val target = storageManager.muatTarget()
         if (target != null) {
             selectedTarget = target
-            val hex = storageManager.dapatkanSavedHex() ?: BleParserUtils.byteArrayToHex(target.manufacturerData)
+            val hex = storageManager.dapatkanDisplayData(target)
+            val infoJenis = if (target.manufacturerId != -1) {
+                "ID Vendor: ${target.manufacturerId}"
+            } else if (target.serviceUuid != null) {
+                "Service UUID: ${BleParserUtils.formatShortUuid(target.serviceUuid)}"
+            } else {
+                "Raw Data"
+            }
+
             tvStatus.text = """
                 DATA TERSIMPAN DIMUATKAN SEMULA:
                 
                 Peranti: ${target.name}
                 MAC Sumber: ${target.address}
-                ID Vendor: ${target.manufacturerId}
+                $infoJenis
                 Data Hex: $hex
                 
                 (Sedia dipancar tanpa perlu imbas! Tekan butang 'Pancar')
