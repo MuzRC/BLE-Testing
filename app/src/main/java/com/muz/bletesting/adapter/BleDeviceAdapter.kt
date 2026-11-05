@@ -9,6 +9,7 @@ import android.widget.TextView
 import com.muz.bletesting.decoder.BeaconDecoder
 import com.muz.bletesting.model.BleTarget
 import com.muz.bletesting.utils.BleParserUtils
+import com.muz.bletesting.utils.BleVendorResolver
 
 class BleDeviceAdapter(
     context: Context,
@@ -26,33 +27,40 @@ class BleDeviceAdapter(
 
         val item = getItem(position)
         if (item != null) {
-            text1.text = "${item.name} (${item.rssi} dBm)"
+            // Huraikan jenama pengeluar cip daripada OUI dan Manufacturer ID
+            val vendorMac = BleVendorResolver.huraikanMacVendor(item.address)
+            val vendorCompany = if (item.manufacturerId != -1) {
+                BleVendorResolver.huraikanCompanyId(item.manufacturerId)
+            } else null
+
+            val labelPengeluar = when {
+                vendorCompany != null && vendorCompany != "Tiada Vendor ID" -> "[$vendorCompany]"
+                else -> "[$vendorMac]"
+            }
+
+            text1.text = "${item.name} (${item.rssi} dBm) $labelPengeluar"
 
             // 1. Semak jika peranti memancarkan format Beacon Standard
             val iBeacon = BeaconDecoder.kesanIBeacon(item.manufacturerId, item.manufacturerData)
             val eddystone = BeaconDecoder.kesanEddystone(item.serviceUuid, item.serviceData)
 
             if (iBeacon != null) {
-                text2.text = "MAC: ${item.address}\n★ $iBeacon"
+                text2.text = "MAC: ${item.address} | $vendorMac\n★ $iBeacon"
             } else if (eddystone != null) {
-                text2.text = "MAC: ${item.address}\n★ $eddystone"
+                text2.text = "MAC: ${item.address} | $vendorMac\n★ $eddystone"
             } else if (item.manufacturerId != -1) {
-                // 2. Format biasa jika ada Vendor ID
                 val hex = BleParserUtils.byteArrayToHex(item.manufacturerData)
-                text2.text = "MAC: ${item.address}\nID Vendor: ${item.manufacturerId} | Data: $hex"
+                text2.text = "MAC: ${item.address} | $vendorMac\nPengeluar: ${vendorCompany ?: "0x" + Integer.toHexString(item.manufacturerId)} | Hex: $hex"
             } else if (item.serviceUuid != null) {
-                // 3. Format Service Data / UUID
                 val shortUuid = BleParserUtils.formatShortUuid(item.serviceUuid)
                 val hex = BleParserUtils.byteArrayToHex(item.serviceData)
-                text2.text = "MAC: ${item.address}\nService UUID: $shortUuid | Data: $hex"
+                text2.text = "MAC: ${item.address} | $vendorMac\nService UUID: $shortUuid | Hex: $hex"
             } else {
-                // 4. Sandaran data mentah
                 val hex = BleParserUtils.byteArrayToHex(item.manufacturerData)
-                text2.text = "MAC: ${item.address}\nRaw Data: $hex"
+                text2.text = "MAC: ${item.address} | $vendorMac\nData Mentah: $hex"
             }
         }
 
-        // Animasi baris senarai meluncur masuk perlahan-lahan
         if (convertView == null) {
             view.alpha = 0f
             view.translationY = 30f
