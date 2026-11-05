@@ -5,7 +5,7 @@ on:
     branches: [ "main", "master" ]
   pull_request:
     branches: [ "main", "master" ]
-  workflow_dispatch: # Membolehkan ko tekan butang 'Run workflow' secara manual di GitHub
+  workflow_dispatch:
 
 jobs:
   build-and-sign:
@@ -20,13 +20,16 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
-          cache: 'gradle'
 
-      - name: Grant Execute Permission for Gradlew
-        run: chmod +x gradlew
+      # Pasang enjin Gradle terus ke sistem GitHub Actions
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
 
+      # Bina APK guna arahan gradle terus (bukan ./gradlew)
       - name: Build Release APK Unsigned
-        run: ./gradlew assembleRelease --no-daemon --stacktrace
+        run: gradle assembleRelease --no-daemon --stacktrace
 
       - name: Sign Android Release APK
         uses: r0adkll/sign-android-release@v1
