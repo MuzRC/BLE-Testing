@@ -94,7 +94,7 @@ class MainActivity : AppCompatActivity() {
     ) { permissions ->
         val allGranted = permissions.entries.all { it.value }
         if (!allGranted) {
-            Toast.makeText(this, "Kebenaran Bluetooth diperlukan!", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Izin Bluetooth diperlukan!", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -128,7 +128,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupControls() {
-        // Kawalan Slider RSSI (-100 dBm hingga -40 dBm)
         sbRssi.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
                 val rssi = -100 + progress
@@ -139,7 +138,6 @@ class MainActivity : AppCompatActivity() {
             override fun onStopTrackingTouch(seekBar: SeekBar?) {}
         })
 
-        // Ketik untuk Simpan & Kunci Target
         lvDevices.setOnItemClickListener { _, _, position, _ ->
             val item = listAdapter.getItem(position) ?: return@setOnItemClickListener
             kunciTarget(item)
@@ -147,14 +145,14 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "${item.name} disimpan ke Bookmark!", Toast.LENGTH_SHORT).show()
         }
 
-        // Tekan lama pada senarai untuk salin data Hex ke papan keratan (Clipboard)
+        // Penanganan klik panjang: perbaikan baris return Boolean
         lvDevices.setOnItemLongClickListener { _, _, position, _ ->
-            val item = listAdapter.getItem(position) ?: return@setOnItemLongClickListener
+            val item = listAdapter.getItem(position) ?: return@setOnItemLongClickListener true
             val hex = if (item.isServiceData) BleParserUtils.byteArrayToHex(item.serviceData) else BleParserUtils.byteArrayToHex(item.manufacturerData)
             val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             val clip = ClipData.newPlainText("BLE Hex", hex)
             clipboard.setPrimaryClip(clip)
-            Toast.makeText(this, "Hex berjaya disalin ke Clipboard!", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Hex berhasil disalin ke Clipboard!", Toast.LENGTH_SHORT).show()
             true
         }
 
@@ -186,7 +184,7 @@ class MainActivity : AppCompatActivity() {
             ManualInjectDialog.tunjuk(this) { targetManual ->
                 kunciTarget(targetManual)
                 profileStorage.simpanKeBookmark(targetManual)
-                Toast.makeText(this, "Target Manual Disediakan!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Target Manual Disiapkan!", Toast.LENGTH_SHORT).show()
             }
         }
 
@@ -194,7 +192,7 @@ class MainActivity : AppCompatActivity() {
             animasiButang(it)
             val berjaya = CsvExportHelper.eksportDanKongsi(this, deviceList)
             if (!berjaya) {
-                Toast.makeText(this, "Tiada data untuk dieksport!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Tidak ada data untuk diekspor!", Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -264,7 +262,6 @@ class MainActivity : AppCompatActivity() {
                     deviceList.add(target)
                 }
 
-                // Jika peranti ini adalah sasaran yang dikunci, cetuskan radar getaran
                 if (selectedTarget?.address == target.address) {
                     proximityManager.semakJarak(target.rssi)
                 }
