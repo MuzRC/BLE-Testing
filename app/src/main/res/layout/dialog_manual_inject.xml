@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="20dp">
+
+    <EditText
+        android:id="@+id/etInjectName"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Nama Label (cth: Beacon Makmal)"
+        android:layout_marginBottom="12dp" />
+
+    <EditText
+        android:id="@+id/etInjectVendorId"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Vendor ID Decimal (cth: 2000, -1 jika tiada)"
+        android:inputType="numberSigned"
+        android:layout_marginBottom="12dp" />
+
+    <EditText
+        android:id="@+id/etInjectHex"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Payload Hex (cth: 8903000000C0...)"
+        android:fontFamily="monospace"
+        android:inputType="textCapCharacters" />
+</LinearLayout>
