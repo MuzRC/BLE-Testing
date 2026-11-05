@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="#12121A"
+    android:padding="16dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Pengesan Tag Penjejak (Anti-Stalking)"
+        android:textColor="#FFFFFF"
+        android:textSize="17sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="2dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Mengesan Apple AirTag, Samsung SmartTag, dan Tile yang mengekori anda."
+        android:textColor="#888899"
+        android:textSize="11sp"
+        android:layout_marginBottom="12dp" />
+
+    <!-- Status Penemuan Tag -->
+    <LinearLayout
+        android:id="@+id/layoutTrackerStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="#1B2032"
+        android:padding="10dp"
+        android:layout_marginBottom="10dp">
+
+        <TextView
+            android:id="@+id/tvTrackerCountBadge"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="0 Tag Mencurigakan Dikesan"
+            android:textColor="#00E676"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Live Scan"
+            android:textColor="#00E5FF"
+            android:textSize="11sp"
+            android:fontFamily="monospace" />
+    </LinearLayout>
+
+    <!-- Senarai Tag Yang Dijumpai -->
+    <ScrollView
+        android:id="@+id/svTrackers"
+        android:layout_width="match_parent"
+        android:layout_height="180dp"
+        android:background="#08090E"
+        android:padding="8dp"
+        android:layout_marginBottom="12dp">
+
+        <TextView
+            android:id="@+id/tvTrackerResults"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="#CAD3DE"
+            android:textSize="11sp"
+            android:fontFamily="monospace"
+            android:lineSpacingExtra="3dp"
+            android:text="[Mengimbas isyarat tag berdekatan... Pastikan Imbasan di Tab 1 aktif.]" />
+    </ScrollView>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:weightSum="2">
+
+        <Button
+            android:id="@+id/btnClearTrackers"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Set Semula"
+            android:backgroundTint="#2E334D"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp"
+            android:layout_marginEnd="4dp" />
+
+        <Button
+            android:id="@+id/btnCloseTrackerDialog"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Tutup"
+            android:backgroundTint="#FF5252"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp"
+            android:layout_marginStart="4dp" />
+    </LinearLayout>
+
+</LinearLayout>
