@@ -20,7 +20,7 @@
         android:textAlignment="center"
         android:background="#161822" />
 
-    <!-- Navigasi Tab Moden -->
+    <!-- Navigasi 4 Tab Moden -->
     <com.google.android.material.tabs.TabLayout
         android:id="@+id/tabLayout"
         android:layout_width="match_parent"
@@ -47,6 +47,11 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="🛠 Audit" />
+
+        <com.google.android.material.tabs.TabItem
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🛡 Sekuriti" />
     </com.google.android.material.tabs.TabLayout>
 
     <!-- Bekas Kandungan Mengikut Tab -->
@@ -55,7 +60,7 @@
         android:layout_height="match_parent"
         android:padding="12dp">
 
-        <!-- ================= TAB 1: IMBAS & RADAR ================= -->
+        <!-- ================= TAB 1: IMBAS ================= -->
         <LinearLayout
             android:id="@+id/layoutTabScanner"
             android:layout_width="match_parent"
@@ -63,7 +68,6 @@
             android:orientation="vertical"
             android:visibility="visible">
 
-            <!-- Kad Penerangan Fungsi -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -89,7 +93,6 @@
                     android:layout_marginTop="2dp" />
             </LinearLayout>
 
-            <!-- Kawalan Slider Jarak RSSI -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -135,7 +138,7 @@
                 android:textStyle="bold" />
         </LinearLayout>
 
-        <!-- ================= TAB 2: PANCAR KLON & BURST ================= -->
+        <!-- ================= TAB 2: PANCAR KLON ================= -->
         <LinearLayout
             android:id="@+id/layoutTabAdvertiser"
             android:layout_width="match_parent"
@@ -143,7 +146,6 @@
             android:orientation="vertical"
             android:visibility="gone">
 
-            <!-- Kad Penerangan Fungsi -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -169,7 +171,6 @@
                     android:layout_marginTop="2dp" />
             </LinearLayout>
 
-            <!-- Kotak Status Profil Aktif -->
             <TextView
                 android:id="@+id/tvStatus"
                 android:layout_width="match_parent"
@@ -225,7 +226,6 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical">
 
-                <!-- Kad Penerangan Fungsi -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
@@ -245,13 +245,23 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Alat bantu untuk mengkaji struktur bait, menguji templat beacon industri, mentadbir profil kegemaran, dan mengeksport rekod ke fail komputer."
+                        android:text="Alat bantu untuk mengkaji struktur bait, selongkar servis GATT dalaman, mentadbir profil kegemaran, dan eksport rekod."
                         android:textColor="#B0B8C8"
                         android:textSize="11sp"
                         android:layout_marginTop="2dp" />
                 </LinearLayout>
 
-                <!-- Alat 1: Radar Gelombang RSSI -->
+                <Button
+                    android:id="@+id/btnGattExplorer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="🔗 Sambung &amp; Selongkar GATT (Bateri &amp; Write Hex)"
+                    android:backgroundTint="#1F2337"
+                    android:textColor="#00E5FF"
+                    android:gravity="start|center_vertical"
+                    android:padding="12dp"
+                    android:layout_marginBottom="8dp" />
+
                 <Button
                     android:id="@+id/btnOpenRadar"
                     android:layout_width="match_parent"
@@ -263,7 +273,6 @@
                     android:padding="12dp"
                     android:layout_marginBottom="8dp" />
 
-                <!-- Alat 2: Pembanding Paket Hex (Diff) -->
                 <Button
                     android:id="@+id/btnDiff"
                     android:layout_width="match_parent"
@@ -275,7 +284,6 @@
                     android:padding="12dp"
                     android:layout_marginBottom="8dp" />
 
-                <!-- Alat 3: Suntik Manual & Templat Siap -->
                 <Button
                     android:id="@+id/btnManualInject"
                     android:layout_width="match_parent"
@@ -287,7 +295,6 @@
                     android:padding="12dp"
                     android:layout_marginBottom="8dp" />
 
-                <!-- Alat 4: Profil Disimpan -->
                 <Button
                     android:id="@+id/btnBookmarks"
                     android:layout_width="match_parent"
@@ -299,7 +306,6 @@
                     android:padding="12dp"
                     android:layout_marginBottom="8dp" />
 
-                <!-- Alat 5: Eksport Log CSV -->
                 <Button
                     android:id="@+id/btnExportCsv"
                     android:layout_width="match_parent"
@@ -310,21 +316,128 @@
                     android:gravity="start|center_vertical"
                     android:padding="12dp"
                     android:layout_marginBottom="8dp" />
-
-                <!-- Butang GATT Explorer -->
-<Button
-    android:id="@+id/btnGattExplorer"
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:text="🔗 Sambung &amp; Selongkar GATT (Bateri &amp; Servis)"
-    android:backgroundTint="#1F2337"
-    android:textColor="#00E5FF"
-    android:gravity="start|center_vertical"
-    android:padding="12dp"
-    android:layout_marginBottom="8dp" />
-                
             </LinearLayout>
         </ScrollView>
+
+        <!-- ================= TAB 4: SEKURITI & ANTI-SPAM ================= -->
+        <LinearLayout
+            android:id="@+id/layoutTabSecurity"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <!-- Kad Penerangan Fungsi -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="#1B2032"
+                android:padding="10dp"
+                android:layout_marginBottom="8dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🛡 Konsol Pertahanan Radio BLE:"
+                    android:textColor="#FF5252"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Mengesan serangan banjir paket radio &amp; perkakasan rogue (Flipper Zero / ESP32 Spammer) secara langsung."
+                    android:textColor="#B0B8C8"
+                    android:textSize="11sp"
+                    android:layout_marginTop="2dp" />
+            </LinearLayout>
+
+            <!-- Kotak Status Trafik PPS & Amaran Serangan -->
+            <LinearLayout
+                android:id="@+id/layoutThreatStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:background="#161822"
+                android:padding="12dp"
+                android:layout_marginBottom="10dp">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/tvThreatBadge"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="STATUS: UDARA BERSIH"
+                        android:textColor="#00E676"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tvThreatDetail"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Kadar trafik radio stabil."
+                        android:textColor="#888899"
+                        android:textSize="11sp"
+                        android:layout_marginTop="2dp" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/tvPpsCounter"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="0 PPS"
+                    android:textColor="#00E5FF"
+                    android:textSize="24sp"
+                    android:fontFamily="monospace"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="⚡ Log Insiden &amp; Serangan Dikesan:"
+                android:textColor="#CAD3DE"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                android:layout_marginBottom="4dp" />
+
+            <!-- Terminal Paparan Log Serangan -->
+            <ScrollView
+                android:id="@+id/svAnomalyLog"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:background="#07080D"
+                android:padding="8dp"
+                android:layout_marginBottom="10dp">
+
+                <TextView
+                    android:id="@+id/tvAnomalyLog"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="#FF5252"
+                    android:textSize="11sp"
+                    android:fontFamily="monospace"
+                    android:lineSpacingExtra="3dp"
+                    android:text="[Menunggu data imbasan udara...]" />
+            </ScrollView>
+
+            <Button
+                android:id="@+id/btnClearSecurityLog"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Kosongkan Log Insiden"
+                android:backgroundTint="#2E3248"
+                android:textColor="#FFFFFF" />
+        </LinearLayout>
 
     </FrameLayout>
 
