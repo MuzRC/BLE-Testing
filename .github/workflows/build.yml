@@ -25,21 +25,42 @@ jobs:
       - name: Build Release APK Unsigned
         run: gradle assembleRelease --no-daemon --stacktrace
 
-      - name: Sign Android Release APK
-        uses: r0adkll/sign-android-release@v1
-        id: sign_app
-        with:
-          releaseDirectory: app/build/outputs/apk/release
-          signingKeyBase64: ${{ secrets.KEYSTORE_BASE64 }}
-          alias: ${{ secrets.KEY_ALIAS }}
-          keyStorePassword: ${{ secrets.KEYSTORE_PASSWORD }}
-          keyPassword: ${{ secrets.KEY_PASSWORD }}
-          buildToolsVersion: "34.0.0"
+      - name: Sign Android Release APK (Native apksigner)
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          # 1. Nyahkod kunci keystore daripada GitHub Secrets
+          echo "$KEYSTORE_BASE64" | base64 --decode > release.jks
+
+          # 2. Kesan fail APK yang baru dibina
+          UNSIGNED_APK=$(find app/build/outputs/apk/release -name "*.apk" | head -n 1)
+          echo "Dijumpai APK: $UNSIGNED_APK"
+
+          # 3. Kesan versi build-tools Android terkini dalam runner
+          BUILD_TOOLS=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -n 1)
+          echo "Menggunakan Build Tools: $BUILD_TOOLS"
+
+          # 4. Susun bait fail (zipalign)
+          $BUILD_TOOLS/zipalign -v -p 4 "$UNSIGNED_APK" app/build/outputs/apk/release/app-aligned.apk
+
+          # 5. Tandatangan APK guna apksigner rasmi
+          $BUILD_TOOLS/apksigner sign --ks release.jks \
+            --ks-key-alias "$KEY_ALIAS" \
+            --ks-pass "pass:$KEYSTORE_PASSWORD" \
+            --key-pass "pass:$KEY_PASSWORD" \
+            --out app/build/outputs/apk/release/BLE-Testing-Signed.apk \
+            app/build/outputs/apk/release/app-aligned.apk
+
+          # 6. Sahkan integriti tandatangan digital
+          $BUILD_TOOLS/apksigner verify app/build/outputs/apk/release/BLE-Testing-Signed.apk
 
       - name: Upload Signed APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: BLE-Testing-Signed-v${{ github.run_number }}
-          path: ${{ steps.sign_app.outputs.signedReleaseFile }}
+          path: app/build/outputs/apk/release/BLE-Testing-Signed.apk
           if-no-files-found: error
           retention-days: 30
