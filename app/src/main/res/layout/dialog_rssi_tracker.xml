@@ -1,88 +1,99 @@
-<?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:orientation="vertical"
-    android:background="#12121A"
-    android:padding="20dp">
+package com.muz.bletesting.dialog
 
-    <TextView
-        android:id="@+id/tvTrackerTitle"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Radar Signal Masa Nyata"
-        android:textColor="#FFFFFF"
-        android:textSize="18sp"
-        android:textStyle="bold"
-        android:layout_marginBottom="2dp" />
+import android.app.AlertDialog
+import android.content.Context
+import android.graphics.Color
+import android.view.LayoutInflater
+import android.widget.Button
+import android.widget.CheckBox
+import android.widget.TextView
+import com.muz.bletesting.R
+import com.muz.bletesting.model.BleTarget
+import com.muz.bletesting.utils.BleAudioGeiger
+import com.muz.bletesting.view.RssiWaveformView
 
-    <TextView
-        android:id="@+id/tvTrackerTargetInfo"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Sasaran: Mengesan..."
-        android:textColor="#AAAAAA"
-        android:textSize="12sp"
-        android:layout_marginBottom="14dp" />
+class RssiTrackerDialog(
+    context: Context,
+    val target: BleTarget
+) {
+    private val dialog: AlertDialog
+    private val tvTargetInfo: TextView
+    private val tvLiveRssi: TextView
+    private val tvZone: TextView
+    private val waveformView: RssiWaveformView
+    private val cbGeiger: CheckBox
+    private val audioGeiger = BleAudioGeiger()
 
-    <!-- Kotak Bacaan Angka Digital RSSI -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:background="#1C1F2E"
-        android:padding="14dp"
-        android:layout_marginBottom="12dp">
+    val isShowing: Boolean
+        get() = dialog.isShowing
 
-        <TextView
-            android:id="@+id/tvLiveRssiValue"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="-75 dBm"
-            android:textColor="#00E5FF"
-            android:textSize="32sp"
-            android:textStyle="bold"
-            android:fontFamily="monospace" />
+    init {
+        val view = LayoutInflater.from(context).inflate(R.layout.dialog_rssi_tracker, null)
 
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:gravity="end">
+        tvTargetInfo = view.findViewById(R.id.tvTrackerTargetInfo)
+        tvLiveRssi = view.findViewById(R.id.tvLiveRssiValue)
+        tvZone = view.findViewById(R.id.tvProximityZone)
+        waveformView = view.findViewById(R.id.rssiWaveformView)
+        cbGeiger = view.findViewById(R.id.cbGeigerAudio)
+        val btnTutup = view.findViewById<Button>(R.id.btnTutupTracker)
 
-            <TextView
-                android:id="@+id/tvProximityZone"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Zon: Sederhana (1 - 3m)"
-                android:textColor="#81C784"
-                android:textSize="13sp"
-                android:textStyle="bold" />
+        tvTargetInfo.text = "Sasaran: ${target.name} [${target.address}]"
+        kemasKiniRssi(target.rssi)
 
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Isyarat Hidup (Live Ping)"
-                android:textColor="#666666"
-                android:textSize="11sp" />
-        </LinearLayout>
-    </LinearLayout>
+        // Suis kawalan bunyi Geiger
+        cbGeiger.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked) {
+                audioGeiger.mula()
+                audioGeiger.kemasKiniRssi(target.rssi)
+            } else {
+                audioGeiger.henti()
+            }
+        }
 
-    <!-- Graf Ayunan Gelombang Signal Masa Nyata -->
-    <com.muz.bletesting.view.RssiWaveformView
-        android:id="@+id/rssiWaveformView"
-        android:layout_width="match_parent"
-        android:layout_height="170dp"
-        android:background="#0D0E15"
-        android:layout_marginBottom="16dp" />
+        dialog = AlertDialog.Builder(context)
+            .setView(view)
+            .create()
 
-    <Button
-        android:id="@+id/btnTutupTracker"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Tutup Radar"
-        android:backgroundTint="#2E3248"
-        android:textColor="#FFFFFF" />
+        btnTutup.setOnClickListener {
+            dialog.dismiss()
+        }
 
-</LinearLayout>
+        dialog.setOnDismissListener {
+            audioGeiger.henti()
+            waveformView.reset()
+        }
+    }
+
+    fun show() {
+        dialog.show()
+    }
+
+    fun dismiss() {
+        dialog.dismiss()
+    }
+
+    fun kemasKiniRssi(rssi: Int) {
+        tvLiveRssi.text = "$rssi dBm"
+        waveformView.addRssi(rssi)
+
+        // Selaraskan kelajuan bunyi secara langsung jika mod audio diaktifkan
+        if (cbGeiger.isChecked) {
+            audioGeiger.kemasKiniRssi(rssi)
+        }
+
+        when {
+            rssi >= -55 -> {
+                tvZone.text = "ZON: SANGAT RAPAT (< 1 meter)"
+                tvZone.setTextColor(Color.parseColor("#FF5252"))
+            }
+            rssi >= -70 -> {
+                tvZone.text = "ZON: SEDERHANA (1 - 3 meter)"
+                tvZone.setTextColor(Color.parseColor("#00E676"))
+            }
+            else -> {
+                tvZone.text = "ZON: JAUH (> 3 meter)"
+                tvZone.setTextColor(Color.parseColor("#FFB74D"))
+            }
+        }
+    }
+}
