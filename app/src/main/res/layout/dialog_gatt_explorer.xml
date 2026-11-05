@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="#12121A"
+    android:padding="16dp">
+
+    <!-- Header Dialog -->
+    <TextView
+        android:id="@+id/tvGattTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="GATT Explorer (Penyelongkar Servis)"
+        android:textColor="#FFFFFF"
+        android:textSize="17sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="2dp" />
+
+    <TextView
+        android:id="@+id/tvGattTargetInfo"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Peranti: Menunggu pilihan..."
+        android:textColor="#888899"
+        android:textSize="12sp"
+        android:layout_marginBottom="12dp" />
+
+    <!-- Bar Status & Penunjuk Bateri -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="#1C1F2E"
+        android:padding="10dp"
+        android:layout_marginBottom="10dp">
+
+        <TextView
+            android:id="@+id/tvGattStatus"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Menyambung..."
+            android:textColor="#00E5FF"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tvBatteryBadge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="#2E334D"
+            android:textColor="#00E676"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:paddingTop="3dp"
+            android:paddingBottom="3dp"
+            android:text="Bateri: --%" />
+    </LinearLayout>
+
+    <!-- Ruang Paparan Pokok Servis (Scrollable) -->
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="240dp"
+        android:background="#0A0B10"
+        android:padding="8dp"
+        android:layout_marginBottom="12dp">
+
+        <TextView
+            android:id="@+id/tvGattServicesTree"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="#CAD3DE"
+            android:textSize="11sp"
+            android:fontFamily="monospace"
+            android:lineSpacingExtra="3dp"
+            android:text="Sedang membaca struktur GATT dalaman..." />
+    </ScrollView>
+
+    <!-- Butang Tindakan -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:weightSum="2">
+
+        <Button
+            android:id="@+id/btnGattDisconnect"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Putuskan"
+            android:backgroundTint="#FF5252"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp"
+            android:layout_marginEnd="4dp" />
+
+        <Button
+            android:id="@+id/btnGattClose"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Tutup"
+            android:backgroundTint="#2E3248"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp"
+            android:layout_marginStart="4dp" />
+    </LinearLayout>
+
+</LinearLayout>
