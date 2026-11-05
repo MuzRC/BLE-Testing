@@ -3,6 +3,7 @@ package com.muz.bletesting.adapter
 import android.content.Context
 import android.view.View
 import android.view.ViewGroup
+import android.view.animation.DecelerateInterpolator
 import android.widget.ArrayAdapter
 import android.widget.TextView
 import com.muz.bletesting.model.BleTarget
@@ -29,6 +30,19 @@ class BleDeviceAdapter(
             val manIdDisplay = if (item.manufacturerId != -1) item.manufacturerId.toString() else "Tiada (Raw)"
             text2.text = "MAC: ${item.address}\nID: $manIdDisplay | Data: $hex"
         }
+
+        // --- ANIMASI MELUNCUR & FADE IN ---
+        if (convertView == null) {
+            view.alpha = 0f
+            view.translationY = 30f
+            view.animate()
+                .alpha(1f)
+                .translationY(0f)
+                .setDuration(350)
+                .setInterpolator(DecelerateInterpolator())
+                .start()
+        }
+
         return view
     }
 }
