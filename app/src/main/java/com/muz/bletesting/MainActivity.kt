@@ -34,6 +34,7 @@ import com.muz.bletesting.dialog.GattExplorerDialog
 import com.muz.bletesting.dialog.ManualInjectDialog
 import com.muz.bletesting.dialog.PacketDiffDialog
 import com.muz.bletesting.dialog.RssiTrackerDialog
+import com.muz.bletesting.dialog.TrackerFinderDialog
 import com.muz.bletesting.model.BleTarget
 import com.muz.bletesting.storage.BleProfileStorage
 import com.muz.bletesting.utils.BleAnomalyDetector
@@ -47,14 +48,14 @@ import java.util.concurrent.CopyOnWriteArrayList
 
 class MainActivity : AppCompatActivity() {
 
-    // Pengurus 4 Tab
+    // Pengurus 4 Tab Navigasi
     private lateinit var tabLayout: TabLayout
     private lateinit var layoutTabScanner: View
     private lateinit var layoutTabAdvertiser: View
     private lateinit var layoutTabTools: View
     private lateinit var layoutTabSecurity: View
 
-    // Komponen Skrin
+    // Komponen Skrin Utama
     private lateinit var tvStatus: TextView
     private lateinit var tvRssiLabel: TextView
     private lateinit var sbRssi: SeekBar
@@ -70,11 +71,12 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnGattExplorer: Button
     private lateinit var lvDevices: ListView
 
-    // Komponen Tab 4: Sekuriti
+    // Komponen Tab 4: Sekuriti & Anti-Spam
     private lateinit var layoutThreatStatus: View
     private lateinit var tvThreatBadge: TextView
     private lateinit var tvThreatDetail: TextView
     private lateinit var tvPpsCounter: TextView
+    private lateinit var btnOpenTrackerFinder: Button
     private lateinit var tvAnomalyLog: TextView
     private lateinit var svAnomalyLog: ScrollView
     private lateinit var btnClearSecurityLog: Button
@@ -94,6 +96,7 @@ class MainActivity : AppCompatActivity() {
 
     private var previousHex: String = ""
     private var rssiTrackerDialog: RssiTrackerDialog? = null
+    private var trackerFinderDialog: TrackerFinderDialog? = null
     private var pulseAnimator: ObjectAnimator? = null
 
     private val updateHandler = Handler(Looper.getMainLooper())
@@ -145,7 +148,7 @@ class MainActivity : AppCompatActivity() {
         layoutTabTools = findViewById(R.id.layoutTabTools)
         layoutTabSecurity = findViewById(R.id.layoutTabSecurity)
 
-        // Sambung Komponen Paparan
+        // Sambung Komponen Tab 1, 2, & 3
         tvStatus = findViewById(R.id.tvStatus)
         tvRssiLabel = findViewById(R.id.tvRssiLabel)
         sbRssi = findViewById(R.id.sbRssi)
@@ -161,11 +164,12 @@ class MainActivity : AppCompatActivity() {
         btnGattExplorer = findViewById(R.id.btnGattExplorer)
         lvDevices = findViewById(R.id.lvDevices)
 
-        // Komponen Tab Sekuriti
+        // Sambung Komponen Tab 4: Sekuriti
         layoutThreatStatus = findViewById(R.id.layoutThreatStatus)
         tvThreatBadge = findViewById(R.id.tvThreatBadge)
         tvThreatDetail = findViewById(R.id.tvThreatDetail)
         tvPpsCounter = findViewById(R.id.tvPpsCounter)
+        btnOpenTrackerFinder = findViewById(R.id.btnOpenTrackerFinder)
         tvAnomalyLog = findViewById(R.id.tvAnomalyLog)
         svAnomalyLog = findViewById(R.id.svAnomalyLog)
         btnClearSecurityLog = findViewById(R.id.btnClearSecurityLog)
@@ -324,6 +328,19 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        // Tab 4: Pengesan Tag Penjejak Gelap (AirTag / SmartTag)
+        btnOpenTrackerFinder.setOnClickListener {
+            animasiButang(it)
+            if (trackerFinderDialog == null) {
+                trackerFinderDialog = TrackerFinderDialog(this)
+            }
+            trackerFinderDialog?.show()
+
+            if (!scannerManager.isScanning) {
+                mulakanImbasan()
+            }
+        }
+
         // Tab 4: Kosongkan Log Insiden Sekuriti
         btnClearSecurityLog.setOnClickListener {
             animasiButang(it)
@@ -408,7 +425,7 @@ class MainActivity : AppCompatActivity() {
                     deviceList.add(target)
                 }
 
-                // 1. Semakan Jarak Proximity
+                // 1. Semakan Jarak Proximity & Graf Radar Gelombang
                 if (selectedTarget?.address == target.address) {
                     proximityManager.semakJarak(target.rssi)
 
@@ -419,7 +436,14 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
 
-                // 2. Analisis Anomali & Serangan Radio untuk Tab 4
+                // 2. Semakan Tag Penjejak Gelap (AirTag / SmartTag / Tile)
+                if (trackerFinderDialog?.isShowing == true) {
+                    runOnUiThread {
+                        trackerFinderDialog?.semakPaket(target)
+                    }
+                }
+
+                // 3. Analisis Anomali & Serangan Radio untuk Tab 4
                 val report = BleAnomalyDetector.prosesPaket(target)
                 runOnUiThread {
                     tvPpsCounter.text = "${report.packetsPerSecond} PPS"
@@ -589,6 +613,7 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         rssiTrackerDialog?.dismiss()
+        trackerFinderDialog?.dismiss()
         cleanupHandler.removeCallbacks(cleanupRunnable)
         proximityManager.hentiSemua()
         hentiDenyutanRadar()
