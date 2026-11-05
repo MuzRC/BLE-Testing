@@ -1,0 +1,53 @@
+package com.muz.bletesting.dialog
+
+import android.app.AlertDialog
+import android.content.Context
+import android.view.LayoutInflater
+import android.widget.Button
+import android.widget.CheckBox
+import android.widget.EditText
+import android.widget.Toast
+import com.muz.bletesting.R
+
+object BurstConfigDialog {
+
+    fun tunjuk(
+        context: Context,
+        isBurstActive: Boolean,
+        currentOnSec: Int,
+        currentOffSec: Int,
+        onSave: (isEnabled: Boolean, onSec: Int, offSec: Int) -> Unit
+    ) {
+        val view = LayoutInflater.from(context).inflate(R.layout.dialog_burst_config, null)
+        val cbEnable = view.findViewById<CheckBox>(R.id.cbEnableBurst)
+        val etOn = view.findViewById<EditText>(R.id.etBurstOn)
+        val etOff = view.findViewById<EditText>(R.id.etBurstOff)
+        val btnSimpan = view.findViewById<Button>(R.id.btnSimpanBurst)
+
+        cbEnable.isChecked = isBurstActive
+        etOn.setText(currentOnSec.toString())
+        etOff.setText(currentOffSec.toString())
+
+        val dialog = AlertDialog.Builder(context)
+            .setView(view)
+            .create()
+
+        btnSimpan.setOnClickListener {
+            val isEnabled = cbEnable.isChecked
+            val onVal = etOn.text.toString().toIntOrNull() ?: 3
+            val offVal = etOff.text.toString().toIntOrNull() ?: 2
+
+            if (onVal < 1 || offVal < 1) {
+                Toast.makeText(context, "Masa minimum ialah 1 saat!", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            onSave(isEnabled, onVal, offVal)
+            val statusTeks = if (isEnabled) "Mod Burst Diaktifkan ($onVal s ON / $offVal s OFF)" else "Mod Burst Dimatikan"
+            Toast.makeText(context, statusTeks, Toast.LENGTH_SHORT).show()
+            dialog.dismiss()
+        }
+
+        dialog.show()
+    }
+}
