@@ -15,8 +15,8 @@ class BleScannerManager(
     var isScanning: Boolean = false
         private set
 
-    // Had minimum kekuatan signal (buang signal sayup-sayup bawah -88 dBm)
-    private val rssiThreshold = -88
+    // 1. HAD JARAK DEKAT: Hanya kesan signal -75 dBm ke atas (anggaran 1 - 2 meter)
+    private val rssiThreshold = -75
 
     private val scanCallback = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult?) {
@@ -25,7 +25,7 @@ class BleScannerManager(
             val device = result.device ?: return
             val devAddress = device.address ?: return
 
-            // 1. POTONG SIGNAL JAUH: Abaikan jika signal terlalu lemah
+            // Tapis signal lemah/jauh
             if (result.rssi < rssiThreshold) {
                 return
             }
@@ -55,8 +55,13 @@ class BleScannerManager(
                 }
             }
 
-            // 2. POTONG SIGNAL TELEFON & PC: Buang spam Apple (76) dan Microsoft (6)
-            if (mId == 76 || mId == 6) {
+            // 2. TAPIS SPAM GAJET: Sekat Apple (76), Microsoft (6), Samsung (117)
+            if (mId == 76 || mId == 6 || mId == 117) {
+                return
+            }
+
+            // 3. TAPIS PAKET KOSONG: Abaikan jika tiada payload berguna langsung
+            if (mId == -1 && sPayload.isEmpty() && sUuid == null && mPayload.isEmpty()) {
                 return
             }
 
@@ -76,7 +81,8 @@ class BleScannerManager(
                 manufacturerData = mPayload,
                 serviceUuid = sUuid,
                 serviceData = sPayload,
-                rssi = result.rssi
+                rssi = result.rssi,
+                lastSeen = System.currentTimeMillis()
             )
 
             onDeviceFound(target)
@@ -117,7 +123,7 @@ class BleScannerManager(
             try {
                 bleScanner?.stopScan(scanCallback)
             } catch (e: Exception) {
-                // Elak ralat jika Bluetooth dimatikan mengejut
+                // Elak ralat jika Bluetooth ditutup mendadak
             }
             isScanning = false
         }
