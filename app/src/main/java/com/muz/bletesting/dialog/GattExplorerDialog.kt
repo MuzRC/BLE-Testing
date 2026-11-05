@@ -6,11 +6,15 @@ import android.content.Context
 import android.view.LayoutInflater
 import android.widget.Button
 import android.widget.EditText
+import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import com.muz.bletesting.R
 import com.muz.bletesting.ble.BleGattManager
 import com.muz.bletesting.model.BleTarget
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 object GattExplorerDialog {
 
@@ -24,11 +28,13 @@ object GattExplorerDialog {
         val tvStatus = view.findViewById<TextView>(R.id.tvGattStatus)
         val tvBattery = view.findViewById<TextView>(R.id.tvBatteryBadge)
         val tvTree = view.findViewById<TextView>(R.id.tvGattServicesTree)
-        
-        // Komponen baharu untuk Write Characteristic
+        val tvLiveLog = view.findViewById<TextView>(R.id.tvLiveStreamLog)
+        val svLive = view.findViewById<ScrollView>(R.id.svLiveStream)
+
         val etCharUuid = view.findViewById<EditText>(R.id.etWriteCharUuid)
         val etHexValue = view.findViewById<EditText>(R.id.etWriteHexValue)
         val btnSendHex = view.findViewById<Button>(R.id.btnSendHex)
+        val btnToggleNotify = view.findViewById<Button>(R.id.btnToggleNotify)
 
         val btnDisconnect = view.findViewById<Button>(R.id.btnGattDisconnect)
         val btnClose = view.findViewById<Button>(R.id.btnGattClose)
@@ -36,6 +42,9 @@ object GattExplorerDialog {
         tvTargetInfo.text = "Peranti: ${target.name} [${target.address}]"
 
         val gattManager = BleGattManager(context)
+        var isSubscribed = false
+        val logBuilder = StringBuilder()
+        val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
 
         val dialog = AlertDialog.Builder(context)
             .setView(view)
@@ -46,6 +55,7 @@ object GattExplorerDialog {
             tvStatus.text = msg
             btnDisconnect.isEnabled = isConnected
             btnSendHex.isEnabled = isConnected
+            btnToggleNotify.isEnabled = isConnected
         }
 
         gattManager.onServicesDiscovered = { list, batteryPercent ->
@@ -62,11 +72,43 @@ object GattExplorerDialog {
             }
         }
 
-        // Paparkan maklum balas bila cip selesai proses arahan Write
+        // Tangkap data masuk masa nyata dari perkakasan
+        gattManager.onNotifyDataReceived = { charUuid, hex, ascii ->
+            val timestamp = timeFormat.format(Date())
+            logBuilder.append("[$timestamp] $charUuid -> $hex ($ascii)\n")
+            tvLiveLog.text = logBuilder.toString()
+            svLive.post { svLive.fullScroll(ScrollView.FOCUS_DOWN) }
+        }
+
         gattManager.onWriteResult = { berjaya, msg ->
             Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
             if (berjaya) {
                 etHexValue.setText("")
+            }
+        }
+
+        // Butang suis langganan siaran langsung
+        btnToggleNotify.setOnClickListener {
+            val charUuid = etCharUuid.text.toString().trim()
+            if (charUuid.isBlank()) {
+                Toast.makeText(context, "Sila masukkan UUID Karakteristik!", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            isSubscribed = !isSubscribed
+            val berjaya = gattManager.tukarLanggananNotify(charUuid, isSubscribed)
+            if (berjaya) {
+                if (isSubscribed) {
+                    btnToggleNotify.text = "✖ Henti"
+                    btnToggleNotify.setBackgroundColor(android.graphics.Color.parseColor("#FF5252"))
+                    Toast.makeText(context, "Mendengar siaran langsung...", Toast.LENGTH_SHORT).show()
+                } else {
+                    btnToggleNotify.text = "📡 Langgan"
+                    btnToggleNotify.setBackgroundColor(android.graphics.Color.parseColor("#00E5FF"))
+                    Toast.makeText(context, "Langganan dihentikan.", Toast.LENGTH_SHORT).show()
+                }
+            } else {
+                isSubscribed = !isSubscribed
             }
         }
 
@@ -98,7 +140,6 @@ object GattExplorerDialog {
             gattManager.tutup()
         }
 
-        // Sambung terus menggunakan perkakasan radio Bluetooth fizikal
         try {
             val device = bluetoothAdapter?.getRemoteDevice(target.address)
             if (device != null) {
