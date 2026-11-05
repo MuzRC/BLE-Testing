@@ -6,12 +6,11 @@
     android:background="#12121A"
     android:padding="16dp">
 
-    <!-- Header Dialog -->
     <TextView
         android:id="@+id/tvGattTitle"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="GATT Explorer (Penyelongkar Servis)"
+        android:text="GATT Explorer &amp; Live Terminal"
         android:textColor="#FFFFFF"
         android:textSize="17sp"
         android:textStyle="bold"
@@ -24,17 +23,16 @@
         android:text="Peranti: Menunggu pilihan..."
         android:textColor="#888899"
         android:textSize="12sp"
-        android:layout_marginBottom="12dp" />
+        android:layout_marginBottom="10dp" />
 
-    <!-- Bar Status & Penunjuk Bateri -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:background="#1C1F2E"
-        android:padding="10dp"
-        android:layout_marginBottom="10dp">
+        android:padding="8dp"
+        android:layout_marginBottom="8dp">
 
         <TextView
             android:id="@+id/tvGattStatus"
@@ -56,18 +54,17 @@
             android:textStyle="bold"
             android:paddingStart="8dp"
             android:paddingEnd="8dp"
-            android:paddingTop="3dp"
-            android:paddingBottom="3dp"
+            android:paddingTop="2dp"
+            android:paddingBottom="2dp"
             android:text="Bateri: --%" />
     </LinearLayout>
 
-    <!-- Ruang Paparan Pokok Servis (Scrollable) -->
     <ScrollView
         android:layout_width="match_parent"
-        android:layout_height="160dp"
+        android:layout_height="120dp"
         android:background="#0A0B10"
-        android:padding="8dp"
-        android:layout_marginBottom="10dp">
+        android:padding="6dp"
+        android:layout_marginBottom="8dp">
 
         <TextView
             android:id="@+id/tvGattServicesTree"
@@ -76,40 +73,77 @@
             android:textColor="#CAD3DE"
             android:textSize="11sp"
             android:fontFamily="monospace"
-            android:lineSpacingExtra="3dp"
+            android:lineSpacingExtra="2dp"
             android:text="Sedang membaca struktur GATT dalaman..." />
     </ScrollView>
 
-    <!-- Kotak Borang Hantar Arahan Write Hex -->
+    <!-- Kotak Log Semburan Live Notify -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="⚡ Siaran Masuk Masa Nyata (Live Stream Log):"
+        android:textColor="#00E676"
+        android:textSize="11sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="4dp" />
+
+    <ScrollView
+        android:id="@+id/svLiveStream"
+        android:layout_width="match_parent"
+        android:layout_height="80dp"
+        android:background="#050608"
+        android:padding="6dp"
+        android:layout_marginBottom="10dp">
+
+        <TextView
+            android:id="@+id/tvLiveStreamLog"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="#81C784"
+            android:textSize="10sp"
+            android:fontFamily="monospace"
+            android:text="[Menunggu langganan aktif...]" />
+    </ScrollView>
+
+    <!-- Borang Tindakan Kawalan & Langganan -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:background="#1B1E2E"
-        android:padding="10dp"
-        android:layout_marginBottom="12dp">
+        android:padding="8dp"
+        android:layout_marginBottom="10dp">
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="✎ Hantar Arahan Hex (Write Characteristic):"
-            android:textColor="#B388FF"
-            android:textSize="11sp"
-            android:textStyle="bold"
-            android:layout_marginBottom="6dp" />
-
-        <EditText
-            android:id="@+id/etWriteCharUuid"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="UUID Karakteristik (cth: 2A06 atau UUID penuh)"
-            android:textColorHint="#666677"
-            android:textColor="#FFFFFF"
-            android:textSize="11sp"
-            android:fontFamily="monospace"
-            android:background="#0F1018"
-            android:padding="8dp"
-            android:layout_marginBottom="6dp" />
+            android:orientation="horizontal"
+            android:layout_marginBottom="6dp">
+
+            <EditText
+                android:id="@+id/etWriteCharUuid"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:hint="UUID Karakteristik (cth: 2A19)"
+                android:textColorHint="#666677"
+                android:textColor="#FFFFFF"
+                android:textSize="11sp"
+                android:fontFamily="monospace"
+                android:background="#0F1018"
+                android:padding="8dp" />
+
+            <Button
+                android:id="@+id/btnToggleNotify"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="📡 Langgan"
+                android:backgroundTint="#00E5FF"
+                android:textColor="#000000"
+                android:textStyle="bold"
+                android:textSize="11sp"
+                android:layout_marginStart="6dp" />
+        </LinearLayout>
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -143,7 +177,6 @@
         </LinearLayout>
     </LinearLayout>
 
-    <!-- Butang Tindakan -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
