@@ -1,20 +1,71 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout android:background="#12121A" android:layout_height="wrap_content" android:layout_width="match_parent" android:orientation="vertical" android:padding="20dp" xmlns:android="[http://schemas.android.com/apk/res/android](http://schemas.android.com/apk/res/android)">
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="#12121A"
+    android:padding="20dp">
 
-    <TextView android:id="@+id/tvTrackerTitle" android:layout_height="wrap_content" android:layout_marginBottom="2dp" android:layout_width="wrap_content" android:text="Radar Signal Masa Nyata" android:textColor="#FFFFFF" android:textSize="18sp" android:textStyle="bold"/>
+    <TextView
+        android:id="@+id/tvTrackerTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Radar Signal Masa Nyata"
+        android:textColor="#FFFFFF"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="2dp" />
 
-    <TextView android:id="@+id/tvTrackerTargetInfo" android:layout_height="wrap_content" android:layout_marginBottom="12dp" android:layout_width="wrap_content" android:text="Sasaran: Mengesan..." android:textColor="#AAAAAA" android:textSize="12sp"/>
+    <TextView
+        android:id="@+id/tvTrackerTargetInfo"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Sasaran: Mengesan..."
+        android:textColor="#AAAAAA"
+        android:textSize="12sp"
+        android:layout_marginBottom="12dp" />
 
     <!-- Bar Bacaan Digital & Zon Jarak -->
-    <LinearLayout android:background="#1C1F2E" android:gravity="center_vertical" android:layout_height="wrap_content" android:layout_marginBottom="10dp" android:layout_width="match_parent" android:orientation="horizontal" android:padding="12dp">
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="#1C1F2E"
+        android:padding="12dp"
+        android:layout_marginBottom="10dp">
 
-        <TextView android:fontFamily="monospace" android:id="@+id/tvLiveRssiValue" android:layout_height="wrap_content" android:layout_width="wrap_content" android:text="-75 dBm" android:textColor="#00E5FF" android:textSize="30sp" android:textStyle="bold"/>
+        <TextView
+            android:id="@+id/tvLiveRssiValue"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="-75 dBm"
+            android:textColor="#00E5FF"
+            android:textSize="30sp"
+            android:textStyle="bold"
+            android:fontFamily="monospace" />
 
-        <LinearLayout android:gravity="end" android:layout_height="wrap_content" android:layout_width="match_parent" android:orientation="vertical">
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="end">
 
-            <TextView android:id="@+id/tvProximityZone" android:layout_height="wrap_content" android:layout_width="wrap_content" android:text="ZON: SEDERHANA" android:textColor="#81C784" android:textSize="12sp" android:textStyle="bold"/>
+            <TextView
+                android:id="@+id/tvProximityZone"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="ZON: SEDERHANA"
+                android:textColor="#81C784"
+                android:textSize="12sp"
+                android:textStyle="bold" />
 
-            <TextView android:layout_height="wrap_content" android:layout_width="wrap_content" android:text="Isyarat Langsung" android:textColor="#666677" android:textSize="11sp"/>
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Isyarat Langsung"
+                android:textColor="#666677"
+                android:textSize="11sp" />
         </LinearLayout>
     </LinearLayout>
 
@@ -27,18 +78,49 @@
         android:layout_marginBottom="12dp" />
 
     <!-- Suis Audio Geiger Counter -->
-    <LinearLayout android:background="#1C1F2E" android:gravity="center_vertical" android:layout_height="wrap_content" android:layout_marginBottom="14dp" android:layout_width="match_parent" android:orientation="horizontal" android:padding="10dp">
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="#1C1F2E"
+        android:padding="10dp"
+        android:layout_marginBottom="14dp">
 
-        <LinearLayout android:layout_height="wrap_content" android:layout_weight="1" android:layout_width="0dp" android:orientation="vertical">
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
 
-            <TextView android:layout_height="wrap_content" android:layout_width="wrap_content" android:text="🔊 Audio Geiger Beeper" android:textColor="#FFFFFF" android:textSize="13sp" android:textStyle="bold"/>
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🔊 Audio Geiger Beeper"
+                android:textColor="#FFFFFF"
+                android:textSize="13sp"
+                android:textStyle="bold" />
 
-            <TextView android:layout_height="wrap_content" android:layout_width="wrap_content" android:text="Bip makin laju bila makin rapat dengan peranti." android:textColor="#888899" android:textSize="10sp"/>
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Bip makin laju bila makin rapat dengan peranti."
+                android:textColor="#888899"
+                android:textSize="10sp" />
         </LinearLayout>
 
-        <CheckBox android:id="@+id/cbGeigerAudio" android:layout_height="wrap_content" android:layout_width="wrap_content"/>
+        <CheckBox
+            android:id="@+id/cbGeigerAudio"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
     </LinearLayout>
 
-    <Button android:backgroundTint="#2E3248" android:id="@+id/btnTutupTracker" android:layout_height="wrap_content" android:layout_width="match_parent" android:text="Tutup Radar" android:textColor="#FFFFFF"/>
+    <Button
+        android:id="@+id/btnTutupTracker"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Tutup Radar"
+        android:backgroundTint="#2E3248"
+        android:textColor="#FFFFFF" />
 
 </LinearLayout>
