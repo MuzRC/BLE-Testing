@@ -3,6 +3,7 @@ package com.muz.bletesting.ble
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.le.*
+import android.os.ParcelUuid
 import com.muz.bletesting.model.BleTarget
 
 class BleAdvertiserManager(
@@ -54,26 +55,49 @@ class BleAdvertiserManager(
             .setConnectable(false)
             .build()
 
-        val payload = if (target.manufacturerData.size > 24) {
-            target.manufacturerData.copyOfRange(0, 24)
-        } else {
-            target.manufacturerData
-        }
-
-        val effectiveManId = if (target.manufacturerId != -1) target.manufacturerId else 0xFFFF
-
         val dataBuilder = AdvertiseData.Builder()
             .setIncludeDeviceName(false)
             .setIncludeTxPowerLevel(false)
-            .addManufacturerData(effectiveManId, payload)
 
-        return try {
+        try {
+            if (target.manufacturerId != -1 && target.manufacturerData.isNotEmpty()) {
+                // 1. Pancar mengikut format Manufacturer Data (Apple, Samsung, Tuya, dll)
+                val payload = if (target.manufacturerData.size > 24) {
+                    target.manufacturerData.copyOfRange(0, 24)
+                } else {
+                    target.manufacturerData
+                }
+                dataBuilder.addManufacturerData(target.manufacturerId, payload)
+            } else if (target.serviceUuid != null) {
+                // 2. Pancar mengikut format Service Data / UUID (Generic BLE / Fast Pair / IoT)
+                val pUuid = ParcelUuid.fromString(target.serviceUuid)
+                dataBuilder.addServiceUuid(pUuid)
+
+                if (target.serviceData.isNotEmpty()) {
+                    // Dihadkan kepada 20 bait bagi mengelakkan limpahan had 31 bait Legacy BLE
+                    val sPayload = if (target.serviceData.size > 20) {
+                        target.serviceData.copyOfRange(0, 20)
+                    } else {
+                        target.serviceData
+                    }
+                    dataBuilder.addServiceData(pUuid, sPayload)
+                }
+            } else {
+                // 3. Sandaran kecemasan jika tiada struktur khusus
+                val payload = if (target.manufacturerData.size > 24) {
+                    target.manufacturerData.copyOfRange(0, 24)
+                } else {
+                    target.manufacturerData
+                }
+                dataBuilder.addManufacturerData(0xFFFF, payload)
+            }
+
             bleAdvertiser?.startAdvertising(settings, dataBuilder.build(), advertiseCallback)
-            true
+            return true
         } catch (e: Exception) {
             onFailure("Ralat memancar: ${e.localizedMessage}")
             isAdvertising = false
-            false
+            return false
         }
     }
 
@@ -82,7 +106,7 @@ class BleAdvertiserManager(
         try {
             bleAdvertiser?.stopAdvertising(advertiseCallback)
         } catch (e: Exception) {
-            // Elak crash
+            // Elak ralat jika perkhidmatan terputus
         }
         isAdvertising = false
     }
