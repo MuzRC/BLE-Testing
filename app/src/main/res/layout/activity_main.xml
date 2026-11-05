@@ -400,6 +400,18 @@
                     android:textStyle="bold" />
             </LinearLayout>
 
+            <!-- Butang Pengesan AirTag / SmartTag (SINI TEMPATNYA) -->
+            <Button
+                android:id="@+id/btnOpenTrackerFinder"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="🔍 Imbas Tag Penjejak Gelap (AirTag / Tile / SmartTag)"
+                android:backgroundTint="#B388FF"
+                android:textColor="#000000"
+                android:textStyle="bold"
+                android:textSize="12sp"
+                android:layout_marginBottom="8dp" />
+
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
