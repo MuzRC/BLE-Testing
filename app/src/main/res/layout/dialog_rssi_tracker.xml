@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="#12121A"
+    android:padding="20dp">
+
+    <TextView
+        android:id="@+id/tvTrackerTitle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Radar Signal Masa Nyata"
+        android:textColor="#FFFFFF"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="2dp" />
+
+    <TextView
+        android:id="@+id/tvTrackerTargetInfo"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Sasaran: Mengesan..."
+        android:textColor="#AAAAAA"
+        android:textSize="12sp"
+        android:layout_marginBottom="14dp" />
+
+    <!-- Kotak Bacaan Angka Digital RSSI -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="#1C1F2E"
+        android:padding="14dp"
+        android:layout_marginBottom="12dp">
+
+        <TextView
+            android:id="@+id/tvLiveRssiValue"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="-75 dBm"
+            android:textColor="#00E5FF"
+            android:textSize="32sp"
+            android:textStyle="bold"
+            android:fontFamily="monospace" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="end">
+
+            <TextView
+                android:id="@+id/tvProximityZone"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Zon: Sederhana (1 - 3m)"
+                android:textColor="#81C784"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Isyarat Hidup (Live Ping)"
+                android:textColor="#666666"
+                android:textSize="11sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Graf Ayunan Gelombang Signal Masa Nyata -->
+    <com.muz.bletesting.view.RssiWaveformView
+        android:id="@+id/rssiWaveformView"
+        android:layout_width="match_parent"
+        android:layout_height="170dp"
+        android:background="#0D0E15"
+        android:layout_marginBottom="16dp" />
+
+    <Button
+        android:id="@+id/btnTutupTracker"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Tutup Radar"
+        android:backgroundTint="#2E3248"
+        android:textColor="#FFFFFF" />
+
+</LinearLayout>
