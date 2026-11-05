@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="#121212"
+    android:padding="16dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Pembanding Paket Hex (Diff)"
+            android:textColor="#FFFFFF"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="12dp" />
+
+        <!-- Input / Paparan Paket Asal -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="1. Paket Rujukan / Asal (Baseline Hex):"
+            android:textColor="#AAAAAA"
+            android:textSize="12sp"
+            android:layout_marginBottom="4dp" />
+
+        <EditText
+            android:id="@+id/etDiffHexAsal"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="#1E1E2E"
+            android:textColor="#E0E0E0"
+            android:textSize="12sp"
+            android:fontFamily="monospace"
+            android:padding="10dp"
+            android:hint="Tampal atau muat Hex asas..."
+            android:textColorHint="#666666"
+            android:inputType="textMultiLine"
+            android:minLines="2"
+            android:layout_marginBottom="10dp" />
+
+        <!-- Input / Paparan Paket Baru -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="2. Paket Semasa / Terkini (Target Hex):"
+            android:textColor="#AAAAAA"
+            android:textSize="12sp"
+            android:layout_marginBottom="4dp" />
+
+        <EditText
+            android:id="@+id/etDiffHexBaru"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="#1E1E2E"
+            android:textColor="#E0E0E0"
+            android:textSize="12sp"
+            android:fontFamily="monospace"
+            android:padding="10dp"
+            android:hint="Tampal Hex yang mahu dibanding..."
+            android:textColorHint="#666666"
+            android:inputType="textMultiLine"
+            android:minLines="2"
+            android:layout_marginBottom="12dp" />
+
+        <Button
+            android:id="@+id/btnJalankanDiff"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Bandingkan Bait Sekarang"
+            android:backgroundTint="#B388FF"
+            android:textColor="#000000"
+            android:textStyle="bold"
+            android:layout_marginBottom="12dp" />
+
+        <!-- Petunjuk Warna -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:layout_marginBottom="8dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="● Sama"
+                android:textColor="#81C784"
+                android:textSize="11sp"
+                android:layout_marginEnd="12dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="● Berubah"
+                android:textColor="#FF5252"
+                android:textSize="11sp"
+                android:layout_marginEnd="12dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="● Tambahan"
+                android:textColor="#64B5F6"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <!-- Kotak Hasil Visual Diff -->
+        <TextView
+            android:id="@+id/tvDiffOutput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="#0A0A10"
+            android:textColor="#FFFFFF"
+            android:textSize="13sp"
+            android:fontFamily="monospace"
+            android:padding="12dp"
+            android:text="Tekan butang di atas untuk melihat perbezaan bait."
+            android:lineSpacingExtra="4dp"
+            android:layout_marginBottom="8dp" />
+
+        <!-- Ringkasan Statistik -->
+        <TextView
+            android:id="@+id/tvDiffStats"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="#BBBBBB"
+            android:textSize="11sp"
+            android:text="Statistik: Belum dijalankan." />
+
+    </LinearLayout>
+</ScrollView>
