@@ -20,6 +20,15 @@ object BleParserUtils {
         return bytes.joinToString("") { "%02X".format(it) }
     }
 
+    fun formatShortUuid(fullUuid: String?): String {
+        if (fullUuid == null) return "Tiada"
+        return if (fullUuid.length >= 8 && fullUuid.startsWith("0000")) {
+            "0x" + fullUuid.substring(4, 8).uppercase()
+        } else {
+            fullUuid.take(8).uppercase()
+        }
+    }
+
     fun kenalpastiSyarikat(id: Int): String {
         return when (id) {
             0x0006 -> "Microsoft"
@@ -73,7 +82,13 @@ object BleParserUtils {
         }
     }
 
-    fun tentukanNamaPeranti(record: ScanRecord, rawDeviceName: String?, manId: Int, payload: ByteArray): String {
+    fun tentukanNamaPeranti(
+        record: ScanRecord,
+        rawDeviceName: String?,
+        manId: Int,
+        payload: ByteArray,
+        serviceUuid: String? = null
+    ): String {
         val officialName = record.deviceName ?: rawDeviceName
         if (!officialName.isNullOrBlank() && !officialName.contains("Tanpa Nama", true)) {
             return officialName
@@ -85,12 +100,17 @@ object BleParserUtils {
         }
 
         val ascii = ekstrakTeksAscii(payload)
-        val namaSyarikat = kenalpastiSyarikat(manId)
 
-        if (!ascii.isNullOrBlank()) {
-            return "$namaSyarikat ($ascii)"
+        if (manId != -1) {
+            val namaSyarikat = kenalpastiSyarikat(manId)
+            return if (!ascii.isNullOrBlank()) "$namaSyarikat ($ascii)" else "Peranti $namaSyarikat"
         }
 
-        return "Peranti $namaSyarikat"
+        if (serviceUuid != null) {
+            val shortUuid = formatShortUuid(serviceUuid)
+            return if (!ascii.isNullOrBlank()) "BLE $shortUuid ($ascii)" else "BLE Service $shortUuid"
+        }
+
+        return if (!ascii.isNullOrBlank()) "Generic BLE ($ascii)" else "Generic BLE Device"
     }
 }
