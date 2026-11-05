@@ -29,6 +29,7 @@ import com.muz.bletesting.ble.BleAdvertiserManager
 import com.muz.bletesting.ble.BleScannerManager
 import com.muz.bletesting.dialog.BookmarkDialog
 import com.muz.bletesting.dialog.BurstConfigDialog
+import com.muz.bletesting.dialog.GattExplorerDialog
 import com.muz.bletesting.dialog.ManualInjectDialog
 import com.muz.bletesting.dialog.PacketDiffDialog
 import com.muz.bletesting.dialog.RssiTrackerDialog
@@ -41,7 +42,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 
 class MainActivity : AppCompatActivity() {
 
-    // Komponen Tab & Layout Bekas
+    // Pengurus Tab & Bekas Muka Skrin
     private lateinit var tabLayout: TabLayout
     private lateinit var layoutTabScanner: View
     private lateinit var layoutTabAdvertiser: View
@@ -60,6 +61,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnManualInject: Button
     private lateinit var btnBookmarks: Button
     private lateinit var btnExportCsv: Button
+    private lateinit var btnGattExplorer: Button
     private lateinit var lvDevices: ListView
 
     private var bluetoothAdapter: BluetoothAdapter? = null
@@ -110,7 +112,7 @@ class MainActivity : AppCompatActivity() {
     ) { permissions ->
         val allGranted = permissions.entries.all { it.value }
         if (!allGranted) {
-            Toast.makeText(this, "Izin Bluetooth diperlukan!", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Kebenaran Bluetooth diperlukan!", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -118,13 +120,13 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // Bind Paparan Tab
+        // Sambung Bekas Navigasi Tab
         tabLayout = findViewById(R.id.tabLayout)
         layoutTabScanner = findViewById(R.id.layoutTabScanner)
         layoutTabAdvertiser = findViewById(R.id.layoutTabAdvertiser)
         layoutTabTools = findViewById(R.id.layoutTabTools)
 
-        // Bind View Setiap Tab
+        // Sambung Butang & Teks Mengikut Tab
         tvStatus = findViewById(R.id.tvStatus)
         tvRssiLabel = findViewById(R.id.tvRssiLabel)
         sbRssi = findViewById(R.id.sbRssi)
@@ -137,6 +139,7 @@ class MainActivity : AppCompatActivity() {
         btnManualInject = findViewById(R.id.btnManualInject)
         btnBookmarks = findViewById(R.id.btnBookmarks)
         btnExportCsv = findViewById(R.id.btnExportCsv)
+        btnGattExplorer = findViewById(R.id.btnGattExplorer)
         lvDevices = findViewById(R.id.lvDevices)
 
         val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
@@ -182,7 +185,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupControls() {
-        // Tab 1: Slider RSSI
+        // Tab 1: Penggelongsor (Slider) RSSI
         sbRssi.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
                 val rssi = -100 + progress
@@ -193,23 +196,23 @@ class MainActivity : AppCompatActivity() {
             override fun onStopTrackingTouch(seekBar: SeekBar?) {}
         })
 
-        // Tab 1: Klik Senarai & Tekan Lama
+        // Tab 1: Ketik Senarai untuk Kunci Sasaran
         lvDevices.setOnItemClickListener { _, _, position, _ ->
             val item = listAdapter.getItem(position) ?: return@setOnItemClickListener
             kunciTarget(item)
             profileStorage.simpanKeBookmark(item)
             Toast.makeText(this, "${item.name} dikunci & disimpan!", Toast.LENGTH_SHORT).show()
-            // Bawa pengguna terus ke Tab Pancar secara automatik
             tabLayout.getTabAt(1)?.select()
         }
 
+        // Tab 1: Tekan Lama Baris Senarai untuk Salin Hex
         lvDevices.setOnItemLongClickListener { _, _, position, _ ->
             val item = listAdapter.getItem(position) ?: return@setOnItemLongClickListener true
             val hex = if (item.isServiceData) BleParserUtils.byteArrayToHex(item.serviceData) else BleParserUtils.byteArrayToHex(item.manufacturerData)
             val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             val clip = ClipData.newPlainText("BLE Hex", hex)
             clipboard.setPrimaryClip(clip)
-            Toast.makeText(this, "Hex berhasil disalin ke Clipboard!", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Hex disalin ke Clipboard!", Toast.LENGTH_SHORT).show()
             true
         }
 
@@ -218,7 +221,7 @@ class MainActivity : AppCompatActivity() {
             if (scannerManager.isScanning) hentikanImbasan() else mulakanImbasan()
         }
 
-        // Tab 2: Kawalan Pancaran & Burst
+        // Tab 2: Kawalan Pancaran Radio
         btnBroadcast.setOnClickListener {
             animasiButang(it)
             mulakanPancaran()
@@ -250,7 +253,7 @@ class MainActivity : AppCompatActivity() {
             if (target != null) {
                 rssiTrackerDialog = RssiTrackerDialog(this, target).apply { show() }
             } else {
-                Toast.makeText(this, "Sila pilih sasaran di Tab Imbas terlebih dahulu!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Sila pilih sasaran di Tab Imbas dahulu!", Toast.LENGTH_SHORT).show()
             }
         }
 
@@ -291,7 +294,20 @@ class MainActivity : AppCompatActivity() {
             animasiButang(it)
             val berjaya = CsvExportHelper.eksportDanKongsi(this, deviceList)
             if (!berjaya) {
-                Toast.makeText(this, "Tidak ada data untuk diekspor!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Tiada data untuk dieksport!", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        // Tab 3: Buka Penyelongkar Servis GATT & Bateri
+        btnGattExplorer.setOnClickListener {
+            animasiButang(it)
+            val target = selectedTarget
+            if (target != null) {
+                // Hentikan imbasan supaya cip radio Bluetooth fokus pada sambungan GATT
+                hentikanImbasan()
+                GattExplorerDialog.tunjuk(this, bluetoothAdapter, target)
+            } else {
+                Toast.makeText(this, "Sila imbas dan pilih sasaran di Tab Imbas dahulu!", Toast.LENGTH_SHORT).show()
             }
         }
     }
