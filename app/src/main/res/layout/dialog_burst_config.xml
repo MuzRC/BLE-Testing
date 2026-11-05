@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="#12121A"
+    android:padding="20dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Tetapan Pancaran Berkala (Burst)"
+        android:textColor="#FFFFFF"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="4dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Pancar berselang-seli untuk jimat bateri dan tiru tingkah laku beacon sebenar."
+        android:textColor="#888899"
+        android:textSize="12sp"
+        android:layout_marginBottom="16dp" />
+
+    <!-- Suis Pengaktifan Mod Burst -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="#1E1E2E"
+        android:padding="12dp"
+        android:layout_marginBottom="14dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Aktifkan Mod Burst"
+            android:textColor="#FFFFFF"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <CheckBox
+            android:id="@+id/cbEnableBurst"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+    </LinearLayout>
+
+    <!-- Tempoh Pancaran Aktif (Saat) -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Tempoh Pancaran Aktif (Saat):"
+        android:textColor="#AAAAAA"
+        android:textSize="12sp"
+        android:layout_marginBottom="4dp" />
+
+    <EditText
+        android:id="@+id/etBurstOn"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#1E1E2E"
+        android:textColor="#00E5FF"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:padding="10dp"
+        android:inputType="number"
+        android:text="3"
+        android:layout_marginBottom="12dp" />
+
+    <!-- Tempoh Rehat / Henti (Saat) -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Tempoh Rehat / Senyap (Saat):"
+        android:textColor="#AAAAAA"
+        android:textSize="12sp"
+        android:layout_marginBottom="4dp" />
+
+    <EditText
+        android:id="@+id/etBurstOff"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#1E1E2E"
+        android:textColor="#FFB74D"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:padding="10dp"
+        android:inputType="number"
+        android:text="2"
+        android:layout_marginBottom="16dp" />
+
+    <Button
+        android:id="@+id/btnSimpanBurst"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Simpan Tetapan"
+        android:backgroundTint="#B388FF"
+        android:textColor="#000000"
+        android:textStyle="bold" />
+
+</LinearLayout>
