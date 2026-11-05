@@ -7,7 +7,8 @@ data class BleTarget(
     val manufacturerData: ByteArray = ByteArray(0),
     val serviceUuid: String? = null,
     val serviceData: ByteArray = ByteArray(0),
-    val rssi: Int = 0
+    val rssi: Int = 0,
+    var lastSeen: Long = System.currentTimeMillis()
 ) {
     val isServiceData: Boolean
         get() = manufacturerId == -1 && serviceUuid != null
