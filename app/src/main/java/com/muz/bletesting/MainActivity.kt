@@ -12,6 +12,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Color
 import android.location.LocationManager
 import android.os.Build
 import android.os.Bundle
@@ -35,18 +36,23 @@ import com.muz.bletesting.dialog.PacketDiffDialog
 import com.muz.bletesting.dialog.RssiTrackerDialog
 import com.muz.bletesting.model.BleTarget
 import com.muz.bletesting.storage.BleProfileStorage
+import com.muz.bletesting.utils.BleAnomalyDetector
 import com.muz.bletesting.utils.BleParserUtils
 import com.muz.bletesting.utils.CsvExportHelper
 import com.muz.bletesting.utils.ProximityAlertManager
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import java.util.concurrent.CopyOnWriteArrayList
 
 class MainActivity : AppCompatActivity() {
 
-    // Pengurus Tab & Bekas Muka Skrin
+    // Pengurus 4 Tab
     private lateinit var tabLayout: TabLayout
     private lateinit var layoutTabScanner: View
     private lateinit var layoutTabAdvertiser: View
     private lateinit var layoutTabTools: View
+    private lateinit var layoutTabSecurity: View
 
     // Komponen Skrin
     private lateinit var tvStatus: TextView
@@ -63,6 +69,18 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnExportCsv: Button
     private lateinit var btnGattExplorer: Button
     private lateinit var lvDevices: ListView
+
+    // Komponen Tab 4: Sekuriti
+    private lateinit var layoutThreatStatus: View
+    private lateinit var tvThreatBadge: TextView
+    private lateinit var tvThreatDetail: TextView
+    private lateinit var tvPpsCounter: TextView
+    private lateinit var tvAnomalyLog: TextView
+    private lateinit var svAnomalyLog: ScrollView
+    private lateinit var btnClearSecurityLog: Button
+
+    private val securityLogBuilder = StringBuilder()
+    private val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
 
     private var bluetoothAdapter: BluetoothAdapter? = null
     private lateinit var profileStorage: BleProfileStorage
@@ -120,13 +138,14 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // Sambung Bekas Navigasi Tab
+        // Sambung Bekas Tab
         tabLayout = findViewById(R.id.tabLayout)
         layoutTabScanner = findViewById(R.id.layoutTabScanner)
         layoutTabAdvertiser = findViewById(R.id.layoutTabAdvertiser)
         layoutTabTools = findViewById(R.id.layoutTabTools)
+        layoutTabSecurity = findViewById(R.id.layoutTabSecurity)
 
-        // Sambung Butang & Teks Mengikut Tab
+        // Sambung Komponen Paparan
         tvStatus = findViewById(R.id.tvStatus)
         tvRssiLabel = findViewById(R.id.tvRssiLabel)
         sbRssi = findViewById(R.id.sbRssi)
@@ -141,6 +160,15 @@ class MainActivity : AppCompatActivity() {
         btnExportCsv = findViewById(R.id.btnExportCsv)
         btnGattExplorer = findViewById(R.id.btnGattExplorer)
         lvDevices = findViewById(R.id.lvDevices)
+
+        // Komponen Tab Sekuriti
+        layoutThreatStatus = findViewById(R.id.layoutThreatStatus)
+        tvThreatBadge = findViewById(R.id.tvThreatBadge)
+        tvThreatDetail = findViewById(R.id.tvThreatDetail)
+        tvPpsCounter = findViewById(R.id.tvPpsCounter)
+        tvAnomalyLog = findViewById(R.id.tvAnomalyLog)
+        svAnomalyLog = findViewById(R.id.svAnomalyLog)
+        btnClearSecurityLog = findViewById(R.id.btnClearSecurityLog)
 
         val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
         bluetoothAdapter = bluetoothManager.adapter
@@ -160,23 +188,10 @@ class MainActivity : AppCompatActivity() {
     private fun setupTabNavigation() {
         tabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
             override fun onTabSelected(tab: TabLayout.Tab?) {
-                when (tab?.position) {
-                    0 -> {
-                        layoutTabScanner.visibility = View.VISIBLE
-                        layoutTabAdvertiser.visibility = View.GONE
-                        layoutTabTools.visibility = View.GONE
-                    }
-                    1 -> {
-                        layoutTabScanner.visibility = View.GONE
-                        layoutTabAdvertiser.visibility = View.VISIBLE
-                        layoutTabTools.visibility = View.GONE
-                    }
-                    2 -> {
-                        layoutTabScanner.visibility = View.GONE
-                        layoutTabAdvertiser.visibility = View.GONE
-                        layoutTabTools.visibility = View.VISIBLE
-                    }
-                }
+                layoutTabScanner.visibility = if (tab?.position == 0) View.VISIBLE else View.GONE
+                layoutTabAdvertiser.visibility = if (tab?.position == 1) View.VISIBLE else View.GONE
+                layoutTabTools.visibility = if (tab?.position == 2) View.VISIBLE else View.GONE
+                layoutTabSecurity.visibility = if (tab?.position == 3) View.VISIBLE else View.GONE
             }
 
             override fun onTabUnselected(tab: TabLayout.Tab?) {}
@@ -205,7 +220,7 @@ class MainActivity : AppCompatActivity() {
             tabLayout.getTabAt(1)?.select()
         }
 
-        // Tab 1: Tekan Lama Baris Senarai untuk Salin Hex
+        // Tab 1: Tekan Lama untuk Salin Hex
         lvDevices.setOnItemLongClickListener { _, _, position, _ ->
             val item = listAdapter.getItem(position) ?: return@setOnItemLongClickListener true
             val hex = if (item.isServiceData) BleParserUtils.byteArrayToHex(item.serviceData) else BleParserUtils.byteArrayToHex(item.manufacturerData)
@@ -221,7 +236,7 @@ class MainActivity : AppCompatActivity() {
             if (scannerManager.isScanning) hentikanImbasan() else mulakanImbasan()
         }
 
-        // Tab 2: Kawalan Pancaran Radio
+        // Tab 2: Kawalan Pancaran
         btnBroadcast.setOnClickListener {
             animasiButang(it)
             mulakanPancaran()
@@ -246,7 +261,18 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Tab 3: Alatan Diagnostik & Audit
+        // Tab 3: Alatan Audit
+        btnGattExplorer.setOnClickListener {
+            animasiButang(it)
+            val target = selectedTarget
+            if (target != null) {
+                hentikanImbasan()
+                GattExplorerDialog.tunjuk(this, bluetoothAdapter, target)
+            } else {
+                Toast.makeText(this, "Sila imbas dan pilih sasaran di Tab Imbas dahulu!", Toast.LENGTH_SHORT).show()
+            }
+        }
+
         btnOpenRadar.setOnClickListener {
             animasiButang(it)
             val target = selectedTarget
@@ -298,17 +324,13 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Tab 3: Buka Penyelongkar Servis GATT & Bateri
-        btnGattExplorer.setOnClickListener {
+        // Tab 4: Kosongkan Log Insiden Sekuriti
+        btnClearSecurityLog.setOnClickListener {
             animasiButang(it)
-            val target = selectedTarget
-            if (target != null) {
-                // Hentikan imbasan supaya cip radio Bluetooth fokus pada sambungan GATT
-                hentikanImbasan()
-                GattExplorerDialog.tunjuk(this, bluetoothAdapter, target)
-            } else {
-                Toast.makeText(this, "Sila imbas dan pilih sasaran di Tab Imbas dahulu!", Toast.LENGTH_SHORT).show()
-            }
+            securityLogBuilder.clear()
+            tvAnomalyLog.text = "[Log insiden dikosongkan.]"
+            BleAnomalyDetector.reset()
+            Toast.makeText(this, "Log dikosongkan!", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -386,6 +408,7 @@ class MainActivity : AppCompatActivity() {
                     deviceList.add(target)
                 }
 
+                // 1. Semakan Jarak Proximity
                 if (selectedTarget?.address == target.address) {
                     proximityManager.semakJarak(target.rssi)
 
@@ -393,6 +416,30 @@ class MainActivity : AppCompatActivity() {
                         runOnUiThread {
                             rssiTrackerDialog?.kemasKiniRssi(target.rssi)
                         }
+                    }
+                }
+
+                // 2. Analisis Anomali & Serangan Radio untuk Tab 4
+                val report = BleAnomalyDetector.prosesPaket(target)
+                runOnUiThread {
+                    tvPpsCounter.text = "${report.packetsPerSecond} PPS"
+
+                    if (report.isUnderAttack) {
+                        layoutThreatStatus.setBackgroundColor(Color.parseColor("#3B141E"))
+                        tvThreatBadge.text = "⚠️ AMARAN: SPAM DIKESAN!"
+                        tvThreatBadge.setTextColor(Color.parseColor("#FF5252"))
+                        tvThreatDetail.text = report.suspiciousReason ?: "Anomali dikesan."
+
+                        val stamp = timeFormat.format(Date())
+                        val jenis = report.attackType ?: "Banjir Trafik"
+                        securityLogBuilder.append("[$stamp] $jenis | Sumber: ${target.address} (${target.rssi} dBm)\n")
+                        tvAnomalyLog.text = securityLogBuilder.toString()
+                        svAnomalyLog.post { svAnomalyLog.fullScroll(ScrollView.FOCUS_DOWN) }
+                    } else {
+                        layoutThreatStatus.setBackgroundColor(Color.parseColor("#161822"))
+                        tvThreatBadge.text = "STATUS: UDARA BERSIH"
+                        tvThreatBadge.setTextColor(Color.parseColor("#00E676"))
+                        tvThreatDetail.text = "Kadar pancaran stabil ($report.packetsPerSecond paket/s)."
                     }
                 }
 
