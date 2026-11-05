@@ -3,10 +3,15 @@ package com.muz.bletesting.model
 data class BleTarget(
     val name: String,
     val address: String,
-    val manufacturerId: Int,
-    val manufacturerData: ByteArray,
-    val rssi: Int
+    val manufacturerId: Int = -1,
+    val manufacturerData: ByteArray = ByteArray(0),
+    val serviceUuid: String? = null,
+    val serviceData: ByteArray = ByteArray(0),
+    val rssi: Int = 0
 ) {
+    val isServiceData: Boolean
+        get() = manufacturerId == -1 && serviceUuid != null
+
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (javaClass != other?.javaClass) return false
