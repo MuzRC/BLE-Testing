@@ -15,12 +15,20 @@ class BleScannerManager(
     var isScanning: Boolean = false
         private set
 
+    // Had minimum kekuatan signal (buang signal sayup-sayup bawah -88 dBm)
+    private val rssiThreshold = -88
+
     private val scanCallback = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult?) {
             super.onScanResult(callbackType, result)
             val record = result?.scanRecord ?: return
             val device = result.device ?: return
             val devAddress = device.address ?: return
+
+            // 1. POTONG SIGNAL JAUH: Abaikan jika signal terlalu lemah
+            if (result.rssi < rssiThreshold) {
+                return
+            }
 
             val manData = record.manufacturerSpecificData
             val serviceDataMap = record.serviceData
@@ -32,23 +40,24 @@ class BleScannerManager(
             var sPayload = ByteArray(0)
 
             if (manData != null && manData.size() > 0) {
-                // Keadaan 1: Ada Manufacturer Specific Data rasmi
                 mId = manData.keyAt(0)
                 mPayload = manData.valueAt(0) ?: ByteArray(0)
             } else if (serviceDataMap != null && serviceDataMap.isNotEmpty()) {
-                // Keadaan 2: Ada Service Data (seperti peranti Generic BLE 7NAQ)
                 val entry = serviceDataMap.entries.first()
                 sUuid = entry.key.toString()
                 sPayload = entry.value ?: ByteArray(0)
             } else if (!serviceUuids.isNullOrEmpty()) {
-                // Keadaan 3: Mempunyai Service UUID
                 sUuid = serviceUuids[0].toString()
             } else {
-                // Keadaan 4: Sandaran bait mentah
                 val rawBytes = record.bytes
                 if (rawBytes != null && rawBytes.isNotEmpty()) {
                     mPayload = rawBytes.take(24).toByteArray()
                 }
+            }
+
+            // 2. POTONG SIGNAL TELEFON & PC: Buang spam Apple (76) dan Microsoft (6)
+            if (mId == 76 || mId == 6) {
+                return
             }
 
             val rawDeviceName = try {
@@ -108,7 +117,7 @@ class BleScannerManager(
             try {
                 bleScanner?.stopScan(scanCallback)
             } catch (e: Exception) {
-                // Elak ralat jika Bluetooth ditutup mengejut
+                // Elak ralat jika Bluetooth dimatikan mengejut
             }
             isScanning = false
         }
