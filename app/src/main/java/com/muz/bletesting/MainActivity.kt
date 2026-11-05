@@ -23,6 +23,7 @@ import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import com.google.android.material.tabs.TabLayout
 import com.muz.bletesting.adapter.BleDeviceAdapter
 import com.muz.bletesting.ble.BleAdvertiserManager
 import com.muz.bletesting.ble.BleScannerManager
@@ -40,14 +41,24 @@ import java.util.concurrent.CopyOnWriteArrayList
 
 class MainActivity : AppCompatActivity() {
 
+    // Komponen Tab & Layout Bekas
+    private lateinit var tabLayout: TabLayout
+    private lateinit var layoutTabScanner: View
+    private lateinit var layoutTabAdvertiser: View
+    private lateinit var layoutTabTools: View
+
+    // Komponen Skrin
     private lateinit var tvStatus: TextView
     private lateinit var tvRssiLabel: TextView
     private lateinit var sbRssi: SeekBar
     private lateinit var btnScan: Button
     private lateinit var btnBroadcast: Button
     private lateinit var btnStopBroadcast: Button
-    private lateinit var btnBookmarks: Button
+    private lateinit var btnConfigBurst: Button
+    private lateinit var btnOpenRadar: Button
+    private lateinit var btnDiff: Button
     private lateinit var btnManualInject: Button
+    private lateinit var btnBookmarks: Button
     private lateinit var btnExportCsv: Button
     private lateinit var lvDevices: ListView
 
@@ -61,12 +72,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var listAdapter: BleDeviceAdapter
     private var selectedTarget: BleTarget? = null
 
-    // Simpanan data paket rujukan untuk perbandingan Hex Diff
     private var previousHex: String = ""
-
-    // Pengurus dialog Radar Gelombang RSSI masa nyata
     private var rssiTrackerDialog: RssiTrackerDialog? = null
-
     private var pulseAnimator: ObjectAnimator? = null
 
     private val updateHandler = Handler(Looper.getMainLooper())
@@ -111,14 +118,24 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        // Bind Paparan Tab
+        tabLayout = findViewById(R.id.tabLayout)
+        layoutTabScanner = findViewById(R.id.layoutTabScanner)
+        layoutTabAdvertiser = findViewById(R.id.layoutTabAdvertiser)
+        layoutTabTools = findViewById(R.id.layoutTabTools)
+
+        // Bind View Setiap Tab
         tvStatus = findViewById(R.id.tvStatus)
         tvRssiLabel = findViewById(R.id.tvRssiLabel)
         sbRssi = findViewById(R.id.sbRssi)
         btnScan = findViewById(R.id.btnScan)
         btnBroadcast = findViewById(R.id.btnBroadcast)
         btnStopBroadcast = findViewById(R.id.btnStopBroadcast)
-        btnBookmarks = findViewById(R.id.btnBookmarks)
+        btnConfigBurst = findViewById(R.id.btnConfigBurst)
+        btnOpenRadar = findViewById(R.id.btnOpenRadar)
+        btnDiff = findViewById(R.id.btnDiff)
         btnManualInject = findViewById(R.id.btnManualInject)
+        btnBookmarks = findViewById(R.id.btnBookmarks)
         btnExportCsv = findViewById(R.id.btnExportCsv)
         lvDevices = findViewById(R.id.lvDevices)
 
@@ -132,11 +149,40 @@ class MainActivity : AppCompatActivity() {
         listAdapter = BleDeviceAdapter(this, deviceList)
         lvDevices.adapter = listAdapter
 
+        setupTabNavigation()
         setupControls()
         semakKebenaran()
     }
 
+    private fun setupTabNavigation() {
+        tabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
+            override fun onTabSelected(tab: TabLayout.Tab?) {
+                when (tab?.position) {
+                    0 -> {
+                        layoutTabScanner.visibility = View.VISIBLE
+                        layoutTabAdvertiser.visibility = View.GONE
+                        layoutTabTools.visibility = View.GONE
+                    }
+                    1 -> {
+                        layoutTabScanner.visibility = View.GONE
+                        layoutTabAdvertiser.visibility = View.VISIBLE
+                        layoutTabTools.visibility = View.GONE
+                    }
+                    2 -> {
+                        layoutTabScanner.visibility = View.GONE
+                        layoutTabAdvertiser.visibility = View.GONE
+                        layoutTabTools.visibility = View.VISIBLE
+                    }
+                }
+            }
+
+            override fun onTabUnselected(tab: TabLayout.Tab?) {}
+            override fun onTabReselected(tab: TabLayout.Tab?) {}
+        })
+    }
+
     private fun setupControls() {
+        // Tab 1: Slider RSSI
         sbRssi.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
                 val rssi = -100 + progress
@@ -147,42 +193,14 @@ class MainActivity : AppCompatActivity() {
             override fun onStopTrackingTouch(seekBar: SeekBar?) {}
         })
 
-        // Ketik kotak status untuk buka Radar Gelombang RSSI masa nyata
-        tvStatus.setOnClickListener {
-            val target = selectedTarget
-            if (target != null) {
-                rssiTrackerDialog = RssiTrackerDialog(this, target).apply { show() }
-            } else {
-                Toast.makeText(this, "Sila imbas dan pilih peranti sasaran dahulu!", Toast.LENGTH_SHORT).show()
-            }
-        }
-
-        // Tekan lama kotak status untuk buka Pembanding Hex Diff
-        tvStatus.setOnLongClickListener {
-            val target = selectedTarget
-            if (target != null) {
-                val hexSemasa = if (target.isServiceData) {
-                    BleParserUtils.byteArrayToHex(target.serviceData)
-                } else {
-                    BleParserUtils.byteArrayToHex(target.manufacturerData)
-                }
-
-                PacketDiffDialog.tunjuk(
-                    context = this,
-                    defaultHexAsal = previousHex,
-                    defaultHexBaru = hexSemasa
-                )
-            } else {
-                Toast.makeText(this, "Tiada peranti sasaran untuk dibandingkan!", Toast.LENGTH_SHORT).show()
-            }
-            true
-        }
-
+        // Tab 1: Klik Senarai & Tekan Lama
         lvDevices.setOnItemClickListener { _, _, position, _ ->
             val item = listAdapter.getItem(position) ?: return@setOnItemClickListener
             kunciTarget(item)
             profileStorage.simpanKeBookmark(item)
-            Toast.makeText(this, "${item.name} disimpan ke Bookmark!", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "${item.name} dikunci & disimpan!", Toast.LENGTH_SHORT).show()
+            // Bawa pengguna terus ke Tab Pancar secara automatik
+            tabLayout.getTabAt(1)?.select()
         }
 
         lvDevices.setOnItemLongClickListener { _, _, position, _ ->
@@ -200,14 +218,19 @@ class MainActivity : AppCompatActivity() {
             if (scannerManager.isScanning) hentikanImbasan() else mulakanImbasan()
         }
 
-        // 1. Ketik Biasa: Mula Pancar Klon
+        // Tab 2: Kawalan Pancaran & Burst
         btnBroadcast.setOnClickListener {
             animasiButang(it)
             mulakanPancaran()
         }
 
-        // 2. Tekan Lama: Buka Dialog Konfigurasi Mod Burst
-        btnBroadcast.setOnLongClickListener {
+        btnStopBroadcast.setOnClickListener {
+            animasiButang(it)
+            hentikanPancaran()
+        }
+
+        btnConfigBurst.setOnClickListener {
+            animasiButang(it)
             BurstConfigDialog.tunjuk(
                 context = this,
                 isBurstActive = advertiserManager.isBurstMode,
@@ -218,20 +241,31 @@ class MainActivity : AppCompatActivity() {
                 advertiserManager.burstOnSeconds = onSec
                 advertiserManager.burstOffSeconds = offSec
             }
-            true
         }
 
-        btnStopBroadcast.setOnClickListener {
+        // Tab 3: Alatan Diagnostik & Audit
+        btnOpenRadar.setOnClickListener {
             animasiButang(it)
-            hentikanPancaran()
-        }
-
-        btnBookmarks.setOnClickListener {
-            animasiButang(it)
-            BookmarkDialog.tunjuk(this, profileStorage) { targetDipilih ->
-                kunciTarget(targetDipilih)
-                Toast.makeText(this, "Profil ${targetDipilih.name} dipilih!", Toast.LENGTH_SHORT).show()
+            val target = selectedTarget
+            if (target != null) {
+                rssiTrackerDialog = RssiTrackerDialog(this, target).apply { show() }
+            } else {
+                Toast.makeText(this, "Sila pilih sasaran di Tab Imbas terlebih dahulu!", Toast.LENGTH_SHORT).show()
             }
+        }
+
+        btnDiff.setOnClickListener {
+            animasiButang(it)
+            val target = selectedTarget
+            val hexSemasa = if (target != null) {
+                if (target.isServiceData) BleParserUtils.byteArrayToHex(target.serviceData) else BleParserUtils.byteArrayToHex(target.manufacturerData)
+            } else ""
+
+            PacketDiffDialog.tunjuk(
+                context = this,
+                defaultHexAsal = previousHex,
+                defaultHexBaru = hexSemasa
+            )
         }
 
         btnManualInject.setOnClickListener {
@@ -240,6 +274,16 @@ class MainActivity : AppCompatActivity() {
                 kunciTarget(targetManual)
                 profileStorage.simpanKeBookmark(targetManual)
                 Toast.makeText(this, "Target Manual Disiapkan!", Toast.LENGTH_SHORT).show()
+                tabLayout.getTabAt(1)?.select()
+            }
+        }
+
+        btnBookmarks.setOnClickListener {
+            animasiButang(it)
+            BookmarkDialog.tunjuk(this, profileStorage) { targetDipilih ->
+                kunciTarget(targetDipilih)
+                Toast.makeText(this, "Profil ${targetDipilih.name} dipilih!", Toast.LENGTH_SHORT).show()
+                tabLayout.getTabAt(1)?.select()
             }
         }
 
@@ -255,7 +299,6 @@ class MainActivity : AppCompatActivity() {
     private fun kunciTarget(item: BleTarget) {
         val hexData = if (item.isServiceData) BleParserUtils.byteArrayToHex(item.serviceData) else BleParserUtils.byteArrayToHex(item.manufacturerData)
 
-        // Simpan rekod paket lama jika ada pertukaran bait pada peranti
         if (selectedTarget != null) {
             val oldHex = if (selectedTarget!!.isServiceData) BleParserUtils.byteArrayToHex(selectedTarget!!.serviceData) else BleParserUtils.byteArrayToHex(selectedTarget!!.manufacturerData)
             if (oldHex != hexData && oldHex.isNotBlank()) {
@@ -264,26 +307,25 @@ class MainActivity : AppCompatActivity() {
         }
 
         selectedTarget = item
-        hentikanImbasan()
 
         val infoJenis = if (item.manufacturerId != -1) {
-            "Jenis: Manufacturer Data (ID: ${item.manufacturerId})"
+            "Jenis: Manufacturer Specific (ID: ${item.manufacturerId})"
         } else if (item.serviceUuid != null) {
             "Jenis: Service Data (${BleParserUtils.formatShortUuid(item.serviceUuid)})"
         } else {
-            "Jenis: Raw Data"
+            "Jenis: Raw Data Fallback"
         }
 
         tvStatus.text = """
-            PROFIL AKTIF:
+            SASARAN TERKUNCI:
             Peranti: ${item.name}
-            MAC Sumber: ${item.address}
+            MAC: ${item.address}
             $infoJenis
-            Data Hex: $hexData
             
-            (Sedia untuk dipancar! Tekan 'Pancar')
-            [Ketik: Buka Radar | Tekan Lama: Hex Diff]
-            [Tips: Tekan lama butang Pancar untuk Mod Burst]
+            Payload Hex:
+            $hexData
+            
+            (Sedia dipancar! Tekan butang 'Pancar Klon')
         """.trimIndent()
     }
 
@@ -328,11 +370,9 @@ class MainActivity : AppCompatActivity() {
                     deviceList.add(target)
                 }
 
-                // Jika target aktif dikesan di udara
                 if (selectedTarget?.address == target.address) {
                     proximityManager.semakJarak(target.rssi)
 
-                    // Suap bacaan RSSI langsung ke Radar Gelombang jika dialog sedang aktif
                     if (rssiTrackerDialog?.isShowing == true) {
                         runOnUiThread {
                             rssiTrackerDialog?.kemasKiniRssi(target.rssi)
@@ -347,9 +387,8 @@ class MainActivity : AppCompatActivity() {
             },
             onError = { msg ->
                 runOnUiThread {
-                    hentiDenyutanRadar()
-                    tvStatus.text = msg
-                    btnScan.text = "1. Mula Imbas Signal"
+                    btnScan.text = "Mula Imbas Signal"
+                    Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
                 }
             }
         )
@@ -371,14 +410,6 @@ class MainActivity : AppCompatActivity() {
                         else -> "MAKSIMUM (+1 hingga +4 dBm)"
                     }
 
-                    val infoJenis = if (target?.manufacturerId != -1) {
-                        "Format: Manufacturer Specific (ID: ${target?.manufacturerId})"
-                    } else if (target?.serviceUuid != null) {
-                        "Format: Service Data (${BleParserUtils.formatShortUuid(target.serviceUuid)})"
-                    } else {
-                        "Format: Raw Fallback (0xFFFF)"
-                    }
-
                     val infoMod = if (advertiserManager.isBurstMode) {
                         "Mod: BURST BERKALA (${advertiserManager.burstOnSeconds}s ON / ${advertiserManager.burstOffSeconds}s OFF)"
                     } else {
@@ -386,10 +417,9 @@ class MainActivity : AppCompatActivity() {
                     }
 
                     tvStatus.text = """
-                        ● SIGNAL SEDANG DIPANCARKAN SECARA TEPAT
+                        ● SIGNAL SEDANG DIPANCARKAN
                         Peranti: ${target?.name}
-                        MAC Sumber: ${target?.address}
-                        $infoJenis
+                        MAC: ${target?.address}
                         $infoMod
                         Kuasa TX: $txLabel
                         Payload ($payloadSize Bytes):
@@ -404,7 +434,6 @@ class MainActivity : AppCompatActivity() {
                 }
             },
             onPulseStatusChange = { isPulseActive ->
-                // Denyutan visual ikut fasa rehat & pancar mod burst
                 runOnUiThread {
                     if (isPulseActive) mulaDenyutanRadar() else hentiDenyutanRadar()
                 }
@@ -415,17 +444,15 @@ class MainActivity : AppCompatActivity() {
     private fun mulakanImbasan() {
         if (!adaKebenaranBle()) {
             semakKebenaran()
-            tvStatus.text = "Kebenaran Bluetooth diperlukan."
             return
         }
 
         if (bluetoothAdapter == null || !bluetoothAdapter!!.isEnabled) {
-            tvStatus.text = "Sila hidupkan Bluetooth telefon."
+            Toast.makeText(this, "Sila hidupkan Bluetooth telefon.", Toast.LENGTH_SHORT).show()
             return
         }
 
         if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.R && !isLocationServiceEnabled()) {
-            tvStatus.text = "Aktifkan GPS/Lokasi untuk imbasan BLE."
             startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
             return
         }
@@ -434,9 +461,7 @@ class MainActivity : AppCompatActivity() {
         listAdapter.notifyDataSetChanged()
 
         if (scannerManager.mulaImbas()) {
-            mulaDenyutanRadar()
             btnScan.text = "Henti Imbas"
-            tvStatus.text = "Mengimbas di udara...\nKetik senarai untuk simpan. Tekan lama untuk salin Hex."
             cleanupHandler.postDelayed(cleanupRunnable, 3000)
         }
     }
@@ -445,8 +470,7 @@ class MainActivity : AppCompatActivity() {
         scannerManager.hentiImbas()
         cleanupHandler.removeCallbacks(cleanupRunnable)
         proximityManager.hentiSemua()
-        hentiDenyutanRadar()
-        btnScan.text = "1. Mula Imbas Signal"
+        btnScan.text = "Mula Imbas Signal"
         updateHandler.removeCallbacks(uiUpdateRunnable)
         pendingUiUpdate = false
     }
@@ -459,7 +483,7 @@ class MainActivity : AppCompatActivity() {
 
         val target = selectedTarget
         if (target == null) {
-            tvStatus.text = "Tiada signal dipilih! Sila imbas atau pilih profil dahulu."
+            Toast.makeText(this, "Tiada sasaran dipilih! Sila imbas atau pilih templat dahulu.", Toast.LENGTH_SHORT).show()
             return
         }
 
@@ -469,7 +493,7 @@ class MainActivity : AppCompatActivity() {
     private fun hentikanPancaran() {
         advertiserManager.hentiPancar()
         hentiDenyutanRadar()
-        tvStatus.text = "Pancaran dihentikan."
+        tvStatus.text = "Pancaran dihentikan.\nSedia untuk memancar semula."
     }
 
     private fun adaKebenaranBle(): Boolean {
