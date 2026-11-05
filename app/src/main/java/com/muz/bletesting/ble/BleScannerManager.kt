@@ -15,8 +15,8 @@ class BleScannerManager(
     var isScanning: Boolean = false
         private set
 
-    // 1. HAD JARAK DEKAT: Hanya kesan signal -75 dBm ke atas (anggaran 1 - 2 meter)
-    private val rssiThreshold = -75
+    // Boleh diubah secara langsung oleh SeekBar di MainActivity (-100 hingga -40 dBm)
+    var rssiThreshold: Int = -75
 
     private val scanCallback = object : ScanCallback() {
         override fun onScanResult(callbackType: Int, result: ScanResult?) {
@@ -25,7 +25,7 @@ class BleScannerManager(
             val device = result.device ?: return
             val devAddress = device.address ?: return
 
-            // Tapis signal lemah/jauh
+            // 1. Tapis signal lemah mengikut had slider masa nyata
             if (result.rssi < rssiThreshold) {
                 return
             }
@@ -55,12 +55,12 @@ class BleScannerManager(
                 }
             }
 
-            // 2. TAPIS SPAM GAJET: Sekat Apple (76), Microsoft (6), Samsung (117)
+            // 2. Sekat peranti pengacau: Apple (76), Microsoft (6), Samsung (117)
             if (mId == 76 || mId == 6 || mId == 117) {
                 return
             }
 
-            // 3. TAPIS PAKET KOSONG: Abaikan jika tiada payload berguna langsung
+            // 3. Abaikan paket kosong tanpa data
             if (mId == -1 && sPayload.isEmpty() && sUuid == null && mPayload.isEmpty()) {
                 return
             }
