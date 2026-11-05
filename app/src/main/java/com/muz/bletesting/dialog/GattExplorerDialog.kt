@@ -5,6 +5,7 @@ import android.bluetooth.BluetoothAdapter
 import android.content.Context
 import android.view.LayoutInflater
 import android.widget.Button
+import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
 import com.muz.bletesting.R
@@ -23,6 +24,12 @@ object GattExplorerDialog {
         val tvStatus = view.findViewById<TextView>(R.id.tvGattStatus)
         val tvBattery = view.findViewById<TextView>(R.id.tvBatteryBadge)
         val tvTree = view.findViewById<TextView>(R.id.tvGattServicesTree)
+        
+        // Komponen baharu untuk Write Characteristic
+        val etCharUuid = view.findViewById<EditText>(R.id.etWriteCharUuid)
+        val etHexValue = view.findViewById<EditText>(R.id.etWriteHexValue)
+        val btnSendHex = view.findViewById<Button>(R.id.btnSendHex)
+
         val btnDisconnect = view.findViewById<Button>(R.id.btnGattDisconnect)
         val btnClose = view.findViewById<Button>(R.id.btnGattClose)
 
@@ -38,6 +45,7 @@ object GattExplorerDialog {
         gattManager.onStatusChange = { msg, isConnected ->
             tvStatus.text = msg
             btnDisconnect.isEnabled = isConnected
+            btnSendHex.isEnabled = isConnected
         }
 
         gattManager.onServicesDiscovered = { list, batteryPercent ->
@@ -52,6 +60,26 @@ object GattExplorerDialog {
             } else {
                 tvTree.text = list.joinToString("\n\n")
             }
+        }
+
+        // Paparkan maklum balas bila cip selesai proses arahan Write
+        gattManager.onWriteResult = { berjaya, msg ->
+            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+            if (berjaya) {
+                etHexValue.setText("")
+            }
+        }
+
+        btnSendHex.setOnClickListener {
+            val charUuid = etCharUuid.text.toString().trim()
+            val hex = etHexValue.text.toString().trim()
+
+            if (charUuid.isBlank() || hex.isBlank()) {
+                Toast.makeText(context, "Sila masukkan UUID dan Data Hex!", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            gattManager.tulisHex(charUuid, hex)
         }
 
         btnDisconnect.setOnClickListener {
@@ -70,7 +98,7 @@ object GattExplorerDialog {
             gattManager.tutup()
         }
 
-        // Dapatkan objek BluetoothDevice fizikal dari alamat MAC dan mulakan jabat tangan
+        // Sambung terus menggunakan perkakasan radio Bluetooth fizikal
         try {
             val device = bluetoothAdapter?.getRemoteDevice(target.address)
             if (device != null) {
