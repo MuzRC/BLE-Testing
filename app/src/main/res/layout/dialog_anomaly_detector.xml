@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="#10121A"
+    android:padding="16dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Perisai Forensik &amp; Pengesan BLE Spam"
+        android:textColor="#FFFFFF"
+        android:textSize="17sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="4dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Mengesan serangan banjir paket radio &amp; perkakasan rogue (Flipper Zero / ESP32 Spammer)."
+        android:textColor="#888899"
+        android:textSize="11sp"
+        android:layout_marginBottom="12dp" />
+
+    <!-- Kotak Meter Trafik & Status Ancaman -->
+    <LinearLayout
+        android:id="@+id/layoutThreatStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="#1B2032"
+        android:padding="12dp"
+        android:layout_marginBottom="10dp">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tvThreatBadge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="STATUS: UDARA BERSIH"
+                android:textColor="#00E676"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tvThreatDetail"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Tiada anomali gelombang dikesan."
+                android:textColor="#B0B8C8"
+                android:textSize="11sp"
+                android:layout_marginTop="2dp" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/tvPpsCounter"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="0 PPS"
+            android:textColor="#00E5FF"
+            android:textSize="22sp"
+            android:fontFamily="monospace"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Log Insiden &amp; Peranti Mencurigakan:"
+        android:textColor="#AAAAAA"
+        android:textSize="11sp"
+        android:layout_marginBottom="4dp" />
+
+    <!-- Terminal Log Ancaman -->
+    <ScrollView
+        android:id="@+id/svAnomalyLog"
+        android:layout_width="match_parent"
+        android:layout_height="140dp"
+        android:background="#07080D"
+        android:padding="8dp"
+        android:layout_marginBottom="12dp">
+
+        <TextView
+            android:id="@+id/tvAnomalyLog"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="#FF5252"
+            android:textSize="11sp"
+            android:fontFamily="monospace"
+            android:lineSpacingExtra="2dp"
+            android:text="[Menunggu data imbasan aktif...]" />
+    </ScrollView>
+
+    <Button
+        android:id="@+id/btnCloseAnomaly"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Tutup Pengesan"
+        android:backgroundTint="#2E3248"
+        android:textColor="#FFFFFF" />
+
+</LinearLayout>
