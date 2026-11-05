@@ -20,34 +20,57 @@ class BleScannerManager(
             super.onScanResult(callbackType, result)
             val record = result?.scanRecord ?: return
             val device = result.device ?: return
-
             val devAddress = device.address ?: return
+
             val manData = record.manufacturerSpecificData
+            val serviceDataMap = record.serviceData
+            val serviceUuids = record.serviceUuids
 
             var mId = -1
-            var payload: ByteArray? = null
+            var mPayload = ByteArray(0)
+            var sUuid: String? = null
+            var sPayload = ByteArray(0)
 
             if (manData != null && manData.size() > 0) {
+                // Keadaan 1: Ada Manufacturer Specific Data rasmi
                 mId = manData.keyAt(0)
-                payload = manData.valueAt(0)
+                mPayload = manData.valueAt(0) ?: ByteArray(0)
+            } else if (serviceDataMap != null && serviceDataMap.isNotEmpty()) {
+                // Keadaan 2: Ada Service Data (seperti peranti Generic BLE 7NAQ)
+                val entry = serviceDataMap.entries.first()
+                sUuid = entry.key.toString()
+                sPayload = entry.value ?: ByteArray(0)
+            } else if (!serviceUuids.isNullOrEmpty()) {
+                // Keadaan 3: Mempunyai Service UUID
+                sUuid = serviceUuids[0].toString()
             } else {
+                // Keadaan 4: Sandaran bait mentah
                 val rawBytes = record.bytes
                 if (rawBytes != null && rawBytes.isNotEmpty()) {
-                    payload = rawBytes.take(24).toByteArray()
+                    mPayload = rawBytes.take(24).toByteArray()
                 }
             }
 
-            if (payload != null) {
-                val rawDeviceName = try {
-                    device.name
-                } catch (e: SecurityException) {
-                    null
-                }
-
-                val finalName = BleParserUtils.tentukanNamaPeranti(record, rawDeviceName, mId, payload)
-                val target = BleTarget(finalName, devAddress, mId, payload, result.rssi)
-                onDeviceFound(target)
+            val rawDeviceName = try {
+                device.name
+            } catch (e: SecurityException) {
+                null
             }
+
+            val finalPayload = if (sPayload.isNotEmpty()) sPayload else mPayload
+            val finalName = BleParserUtils.tentukanNamaPeranti(record, rawDeviceName, mId, finalPayload, sUuid)
+
+            val target = BleTarget(
+                name = finalName,
+                address = devAddress,
+                manufacturerId = mId,
+                manufacturerData = mPayload,
+                serviceUuid = sUuid,
+                serviceData = sPayload,
+                rssi = result.rssi
+            )
+
+            onDeviceFound(target)
         }
 
         override fun onScanFailed(errorCode: Int) {
@@ -85,7 +108,7 @@ class BleScannerManager(
             try {
                 bleScanner?.stopScan(scanCallback)
             } catch (e: Exception) {
-                // Elak crash jika radio dimatikan mengejut
+                // Elak ralat jika Bluetooth ditutup mengejut
             }
             isScanning = false
         }
