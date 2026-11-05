@@ -1,138 +1,319 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:background="#0F1016">
 
+    <!-- Bar Tajuk Utama -->
     <TextView
         android:id="@+id/tvHeader"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="BLE Testing &amp; Cloner Pro"
-        android:textSize="20sp"
+        android:textColor="#FFFFFF"
+        android:textSize="18sp"
         android:textStyle="bold"
+        android:paddingTop="12dp"
+        android:paddingBottom="10dp"
         android:textAlignment="center"
-        android:layout_marginBottom="8dp" />
+        android:background="#161822" />
 
-    <!-- Bar Butang Alat 4 Slot: Profil, Inject, Diff & CSV -->
-    <LinearLayout
+    <!-- Navigasi Tab Moden -->
+    <com.google.android.material.tabs.TabLayout
+        android:id="@+id/tabLayout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:weightSum="4"
-        android:layout_marginBottom="8dp">
+        android:background="#1A1D2B"
+        app:tabTextColor="#8F96A3"
+        app:tabSelectedTextColor="#00E5FF"
+        app:tabIndicatorColor="#00E5FF"
+        app:tabIndicatorHeight="3dp"
+        app:tabMode="fixed"
+        app:tabGravity="fill">
 
-        <Button
-            android:id="@+id/btnBookmarks"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="★ Profil"
-            android:textSize="11sp" />
-
-        <Button
-            android:id="@+id/btnManualInject"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_marginStart="3dp"
-            android:text="✎ Inject"
-            android:textSize="11sp" />
-
-        <Button
-            android:id="@+id/btnDiff"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_marginStart="3dp"
-            android:text="⇄ Diff"
-            android:textSize="11sp" />
-
-        <Button
-            android:id="@+id/btnExportCsv"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:layout_marginStart="3dp"
-            android:text="⤓ CSV"
-            android:textSize="11sp" />
-    </LinearLayout>
-
-    <!-- Kawalan Slider Jarak RSSI Masa Nyata -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:padding="4dp"
-        android:layout_marginBottom="8dp">
-
-        <TextView
-            android:id="@+id/tvRssiLabel"
+        <com.google.android.material.tabs.TabItem
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Tapis: -75 dBm"
-            android:textSize="13sp"
-            android:textStyle="bold" />
+            android:text="🔍 Imbas" />
 
-        <SeekBar
-            android:id="@+id/sbRssi"
-            android:layout_width="match_parent"
+        <com.google.android.material.tabs.TabItem
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:max="60"
-            android:progress="25" />
-    </LinearLayout>
+            android:text="📡 Pancar" />
 
-    <!-- Kotak Status Maklumat & Data Semasa -->
-    <TextView
-        android:id="@+id/tvStatus"
+        <com.google.android.material.tabs.TabItem
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🛠 Audit" />
+    </com.google.android.material.tabs.TabLayout>
+
+    <!-- Bekas Kandungan Mengikut Tab -->
+    <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="#E2E8F0"
-        android:textColor="#0F172A"
-        android:padding="12dp"
-        android:text="Tekan '1. Mula Imbas Signal' untuk mengesan peranti."
-        android:textSize="13sp"
-        android:fontFamily="monospace"
-        android:layout_marginBottom="12dp" />
+        android:layout_height="match_parent"
+        android:padding="12dp">
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Senarai Signal BLE Terdekat (Ketik untuk pilih):"
-        android:textSize="14sp"
-        android:textStyle="bold"
-        android:layout_marginBottom="6dp" />
+        <!-- ================= TAB 1: IMBAS & RADAR ================= -->
+        <LinearLayout
+            android:id="@+id/layoutTabScanner"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:visibility="visible">
 
-    <!-- Senarai Pilihan Peranti -->
-    <ListView
-        android:id="@+id/lvDevices"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:divider="#334155"
-        android:dividerHeight="1dp"
-        android:layout_marginBottom="12dp" />
+            <!-- Kad Penerangan Fungsi -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="#1B2032"
+                android:padding="10dp"
+                android:layout_marginBottom="8dp">
 
-    <Button
-        android:id="@+id/btnScan"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="1. Mula Imbas Signal" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="ℹ Panduan Mod Imbas:"
+                    android:textColor="#00E5FF"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
 
-    <Button
-        android:id="@+id/btnBroadcast"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:text="2. Pancar Klon (Advertise)" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Kesan paket BLE di udara. Tapis signal jauh menggunakan slider RSSI. Ketik mana-mana peranti untuk kunci sasaran klon."
+                    android:textColor="#B0B8C8"
+                    android:textSize="11sp"
+                    android:layout_marginTop="2dp" />
+            </LinearLayout>
 
-    <Button
-        android:id="@+id/btnStopBroadcast"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="6dp"
-        android:text="Henti Pancaran" />
+            <!-- Kawalan Slider Jarak RSSI -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:background="#161822"
+                android:padding="6dp"
+                android:layout_marginBottom="6dp">
+
+                <TextView
+                    android:id="@+id/tvRssiLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Tapis: -75 dBm"
+                    android:textColor="#00E676"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <SeekBar
+                    android:id="@+id/sbRssi"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:max="60"
+                    android:progress="25" />
+            </LinearLayout>
+
+            <ListView
+                android:id="@+id/lvDevices"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:divider="#202436"
+                android:dividerHeight="1dp"
+                android:layout_marginBottom="8dp" />
+
+            <Button
+                android:id="@+id/btnScan"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Mula Imbas Signal"
+                android:backgroundTint="#B388FF"
+                android:textColor="#000000"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- ================= TAB 2: PANCAR KLON & BURST ================= -->
+        <LinearLayout
+            android:id="@+id/layoutTabAdvertiser"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <!-- Kad Penerangan Fungsi -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="#1B2032"
+                android:padding="10dp"
+                android:layout_marginBottom="8dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="ℹ Panduan Mod Pancaran:"
+                    android:textColor="#00E5FF"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Memancarkan semula isyarat sasaran ke udara. Guna butang Mod Burst untuk pancar secara berkala bagi menjimatkan bateri telefon."
+                    android:textColor="#B0B8C8"
+                    android:textSize="11sp"
+                    android:layout_marginTop="2dp" />
+            </LinearLayout>
+
+            <!-- Kotak Status Profil Aktif -->
+            <TextView
+                android:id="@+id/tvStatus"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:background="#161822"
+                android:textColor="#E0E6ED"
+                android:textSize="12sp"
+                android:fontFamily="monospace"
+                android:padding="14dp"
+                android:text="Belum ada sasaran dipilih.\nSila imbas di Tab 1 atau pilih templat di Tab 3."
+                android:layout_marginBottom="10dp" />
+
+            <Button
+                android:id="@+id/btnConfigBurst"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="⚙ Tetapan Mod Burst (Pancar Berkala)"
+                android:backgroundTint="#2E334D"
+                android:textColor="#FFFFFF"
+                android:textSize="12sp"
+                android:layout_marginBottom="6dp" />
+
+            <Button
+                android:id="@+id/btnBroadcast"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Pancar Klon (Advertise)"
+                android:backgroundTint="#00E676"
+                android:textColor="#000000"
+                android:textStyle="bold"
+                android:layout_marginBottom="6dp" />
+
+            <Button
+                android:id="@+id/btnStopBroadcast"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Henti Pancaran"
+                android:backgroundTint="#FF5252"
+                android:textColor="#FFFFFF"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- ================= TAB 3: AUDIT & ALATAN ================= -->
+        <ScrollView
+            android:id="@+id/layoutTabTools"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <!-- Kad Penerangan Fungsi -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:background="#1B2032"
+                    android:padding="10dp"
+                    android:layout_marginBottom="12dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="ℹ Panduan Alatan Audit &amp; Forensik:"
+                        android:textColor="#00E5FF"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Alat bantu untuk mengkaji struktur bait, menguji templat beacon industri, mentadbir profil kegemaran, dan mengeksport rekod ke fail komputer."
+                        android:textColor="#B0B8C8"
+                        android:textSize="11sp"
+                        android:layout_marginTop="2dp" />
+                </LinearLayout>
+
+                <!-- Alat 1: Radar Gelombang RSSI -->
+                <Button
+                    android:id="@+id/btnOpenRadar"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="∿ Radar Gelombang RSSI Masa Nyata"
+                    android:backgroundTint="#1F2337"
+                    android:textColor="#00E5FF"
+                    android:gravity="start|center_vertical"
+                    android:padding="12dp"
+                    android:layout_marginBottom="8dp" />
+
+                <!-- Alat 2: Pembanding Paket Hex (Diff) -->
+                <Button
+                    android:id="@+id/btnDiff"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="⇄ Pembanding Bait Hex (Packet Diff)"
+                    android:backgroundTint="#1F2337"
+                    android:textColor="#FFFFFF"
+                    android:gravity="start|center_vertical"
+                    android:padding="12dp"
+                    android:layout_marginBottom="8dp" />
+
+                <!-- Alat 3: Suntik Manual & Templat Siap -->
+                <Button
+                    android:id="@+id/btnManualInject"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="✎ Pustaka Templat Siap / Suntik Hex"
+                    android:backgroundTint="#1F2337"
+                    android:textColor="#FFFFFF"
+                    android:gravity="start|center_vertical"
+                    android:padding="12dp"
+                    android:layout_marginBottom="8dp" />
+
+                <!-- Alat 4: Profil Disimpan -->
+                <Button
+                    android:id="@+id/btnBookmarks"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="★ Senarai Profil Disimpan (Bookmark)"
+                    android:backgroundTint="#1F2337"
+                    android:textColor="#FFFFFF"
+                    android:gravity="start|center_vertical"
+                    android:padding="12dp"
+                    android:layout_marginBottom="8dp" />
+
+                <!-- Alat 5: Eksport Log CSV -->
+                <Button
+                    android:id="@+id/btnExportCsv"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="⤓ Eksport Senarai Imbasan ke CSV"
+                    android:backgroundTint="#1F2337"
+                    android:textColor="#81C784"
+                    android:gravity="start|center_vertical"
+                    android:padding="12dp"
+                    android:layout_marginBottom="8dp" />
+
+            </LinearLayout>
+        </ScrollView>
+
+    </FrameLayout>
 
 </LinearLayout>
