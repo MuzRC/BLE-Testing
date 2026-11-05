@@ -1,99 +1,44 @@
-package com.muz.bletesting.dialog
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout android:background="#12121A" android:layout_height="wrap_content" android:layout_width="match_parent" android:orientation="vertical" android:padding="20dp" xmlns:android="[http://schemas.android.com/apk/res/android](http://schemas.android.com/apk/res/android)">
 
-import android.app.AlertDialog
-import android.content.Context
-import android.graphics.Color
-import android.view.LayoutInflater
-import android.widget.Button
-import android.widget.CheckBox
-import android.widget.TextView
-import com.muz.bletesting.R
-import com.muz.bletesting.model.BleTarget
-import com.muz.bletesting.utils.BleAudioGeiger
-import com.muz.bletesting.view.RssiWaveformView
+    <TextView android:id="@+id/tvTrackerTitle" android:layout_height="wrap_content" android:layout_marginBottom="2dp" android:layout_width="wrap_content" android:text="Radar Signal Masa Nyata" android:textColor="#FFFFFF" android:textSize="18sp" android:textStyle="bold"/>
 
-class RssiTrackerDialog(
-    context: Context,
-    val target: BleTarget
-) {
-    private val dialog: AlertDialog
-    private val tvTargetInfo: TextView
-    private val tvLiveRssi: TextView
-    private val tvZone: TextView
-    private val waveformView: RssiWaveformView
-    private val cbGeiger: CheckBox
-    private val audioGeiger = BleAudioGeiger()
+    <TextView android:id="@+id/tvTrackerTargetInfo" android:layout_height="wrap_content" android:layout_marginBottom="12dp" android:layout_width="wrap_content" android:text="Sasaran: Mengesan..." android:textColor="#AAAAAA" android:textSize="12sp"/>
 
-    val isShowing: Boolean
-        get() = dialog.isShowing
+    <!-- Bar Bacaan Digital & Zon Jarak -->
+    <LinearLayout android:background="#1C1F2E" android:gravity="center_vertical" android:layout_height="wrap_content" android:layout_marginBottom="10dp" android:layout_width="match_parent" android:orientation="horizontal" android:padding="12dp">
 
-    init {
-        val view = LayoutInflater.from(context).inflate(R.layout.dialog_rssi_tracker, null)
+        <TextView android:fontFamily="monospace" android:id="@+id/tvLiveRssiValue" android:layout_height="wrap_content" android:layout_width="wrap_content" android:text="-75 dBm" android:textColor="#00E5FF" android:textSize="30sp" android:textStyle="bold"/>
 
-        tvTargetInfo = view.findViewById(R.id.tvTrackerTargetInfo)
-        tvLiveRssi = view.findViewById(R.id.tvLiveRssiValue)
-        tvZone = view.findViewById(R.id.tvProximityZone)
-        waveformView = view.findViewById(R.id.rssiWaveformView)
-        cbGeiger = view.findViewById(R.id.cbGeigerAudio)
-        val btnTutup = view.findViewById<Button>(R.id.btnTutupTracker)
+        <LinearLayout android:gravity="end" android:layout_height="wrap_content" android:layout_width="match_parent" android:orientation="vertical">
 
-        tvTargetInfo.text = "Sasaran: ${target.name} [${target.address}]"
-        kemasKiniRssi(target.rssi)
+            <TextView android:id="@+id/tvProximityZone" android:layout_height="wrap_content" android:layout_width="wrap_content" android:text="ZON: SEDERHANA" android:textColor="#81C784" android:textSize="12sp" android:textStyle="bold"/>
 
-        // Suis kawalan bunyi Geiger
-        cbGeiger.setOnCheckedChangeListener { _, isChecked ->
-            if (isChecked) {
-                audioGeiger.mula()
-                audioGeiger.kemasKiniRssi(target.rssi)
-            } else {
-                audioGeiger.henti()
-            }
-        }
+            <TextView android:layout_height="wrap_content" android:layout_width="wrap_content" android:text="Isyarat Langsung" android:textColor="#666677" android:textSize="11sp"/>
+        </LinearLayout>
+    </LinearLayout>
 
-        dialog = AlertDialog.Builder(context)
-            .setView(view)
-            .create()
+    <!-- Graf Gelombang Neon (Oscilloscope) -->
+    <com.muz.bletesting.view.RssiWaveformView
+        android:id="@+id/rssiWaveformView"
+        android:layout_width="match_parent"
+        android:layout_height="150dp"
+        android:background="#0D0E15"
+        android:layout_marginBottom="12dp" />
 
-        btnTutup.setOnClickListener {
-            dialog.dismiss()
-        }
+    <!-- Suis Audio Geiger Counter -->
+    <LinearLayout android:background="#1C1F2E" android:gravity="center_vertical" android:layout_height="wrap_content" android:layout_marginBottom="14dp" android:layout_width="match_parent" android:orientation="horizontal" android:padding="10dp">
 
-        dialog.setOnDismissListener {
-            audioGeiger.henti()
-            waveformView.reset()
-        }
-    }
+        <LinearLayout android:layout_height="wrap_content" android:layout_weight="1" android:layout_width="0dp" android:orientation="vertical">
 
-    fun show() {
-        dialog.show()
-    }
+            <TextView android:layout_height="wrap_content" android:layout_width="wrap_content" android:text="🔊 Audio Geiger Beeper" android:textColor="#FFFFFF" android:textSize="13sp" android:textStyle="bold"/>
 
-    fun dismiss() {
-        dialog.dismiss()
-    }
+            <TextView android:layout_height="wrap_content" android:layout_width="wrap_content" android:text="Bip makin laju bila makin rapat dengan peranti." android:textColor="#888899" android:textSize="10sp"/>
+        </LinearLayout>
 
-    fun kemasKiniRssi(rssi: Int) {
-        tvLiveRssi.text = "$rssi dBm"
-        waveformView.addRssi(rssi)
+        <CheckBox android:id="@+id/cbGeigerAudio" android:layout_height="wrap_content" android:layout_width="wrap_content"/>
+    </LinearLayout>
 
-        // Selaraskan kelajuan bunyi secara langsung jika mod audio diaktifkan
-        if (cbGeiger.isChecked) {
-            audioGeiger.kemasKiniRssi(rssi)
-        }
+    <Button android:backgroundTint="#2E3248" android:id="@+id/btnTutupTracker" android:layout_height="wrap_content" android:layout_width="match_parent" android:text="Tutup Radar" android:textColor="#FFFFFF"/>
 
-        when {
-            rssi >= -55 -> {
-                tvZone.text = "ZON: SANGAT RAPAT (< 1 meter)"
-                tvZone.setTextColor(Color.parseColor("#FF5252"))
-            }
-            rssi >= -70 -> {
-                tvZone.text = "ZON: SEDERHANA (1 - 3 meter)"
-                tvZone.setTextColor(Color.parseColor("#00E676"))
-            }
-            else -> {
-                tvZone.text = "ZON: JAUH (> 3 meter)"
-                tvZone.setTextColor(Color.parseColor("#FFB74D"))
-            }
-        }
-    }
-}
+</LinearLayout>
