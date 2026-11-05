@@ -52,13 +52,31 @@ class MainActivity : AppCompatActivity() {
     @Volatile
     private var pendingUiUpdate = false
 
-    // SUSUN IKUT PALING DEKAT (RSSI TERTINGGI KE TERENDAH)
+    // Susun senarai ikut kekuatan signal (RSSI paling tinggi di atas)
     private val uiUpdateRunnable = Runnable {
+        val now = System.currentTimeMillis()
+        deviceList.removeIf { now - it.lastSeen > 10000 }
         val sortedList = deviceList.sortedByDescending { it.rssi }
         deviceList.clear()
         deviceList.addAll(sortedList)
         listAdapter.notifyDataSetChanged()
         pendingUiUpdate = false
+    }
+
+    // Pembersih berkala: Buang peranti yang hilang melebihi 10 saat
+    private val cleanupHandler = Handler(Looper.getMainLooper())
+    private val cleanupRunnable = object : Runnable {
+        override fun run() {
+            if (scannerManager.isScanning) {
+                val now = System.currentTimeMillis()
+                val sizeSebelum = deviceList.size
+                deviceList.removeIf { now - it.lastSeen > 10000 }
+                if (deviceList.size != sizeSebelum) {
+                    listAdapter.notifyDataSetChanged()
+                }
+                cleanupHandler.postDelayed(this, 3000)
+            }
+        }
     }
 
     private val requestPermissionLauncher = registerForActivityResult(
@@ -179,6 +197,8 @@ class MainActivity : AppCompatActivity() {
             onDeviceFound = { target ->
                 val existingIndex = deviceList.indexOfFirst { it.address == target.address }
                 if (existingIndex != -1) {
+                    val existing = deviceList[existingIndex]
+                    existing.lastSeen = System.currentTimeMillis()
                     deviceList[existingIndex] = target
                 } else {
                     deviceList.add(target)
@@ -298,11 +318,14 @@ class MainActivity : AppCompatActivity() {
             mulaDenyutanRadar()
             btnScan.text = "Henti Imbas"
             tvStatus.text = "Sedang mengimbas di udara...\nKetik mana-mana peranti untuk simpan & pancar semula."
+            // Mulakan kitaran pembersihan peranti terputus
+            cleanupHandler.postDelayed(cleanupRunnable, 3000)
         }
     }
 
     private fun hentikanImbasan() {
         scannerManager.hentiImbas()
+        cleanupHandler.removeCallbacks(cleanupRunnable)
         hentiDenyutanRadar()
         btnScan.text = "1. Mula Imbas Signal"
         updateHandler.removeCallbacks(uiUpdateRunnable)
@@ -383,6 +406,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        cleanupHandler.removeCallbacks(cleanupRunnable)
         hentiDenyutanRadar()
         hentikanImbasan()
         hentikanPancaran()
