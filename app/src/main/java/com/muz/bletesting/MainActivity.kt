@@ -51,7 +51,12 @@ class MainActivity : AppCompatActivity() {
     private val updateHandler = Handler(Looper.getMainLooper())
     @Volatile
     private var pendingUiUpdate = false
+
+    // SUSUN IKUT PALING DEKAT (RSSI TERTINGGI KE TERENDAH)
     private val uiUpdateRunnable = Runnable {
+        val sortedList = deviceList.sortedByDescending { it.rssi }
+        deviceList.clear()
+        deviceList.addAll(sortedList)
         listAdapter.notifyDataSetChanged()
         pendingUiUpdate = false
     }
