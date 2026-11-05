@@ -17,13 +17,11 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      # Pasang enjin Gradle terus ke sistem GitHub Actions
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.7'
 
-      # Bina APK guna arahan gradle terus (bukan ./gradlew)
       - name: Build Release APK Unsigned
         run: gradle assembleRelease --no-daemon --stacktrace
 
@@ -36,6 +34,7 @@ jobs:
           alias: ${{ secrets.KEY_ALIAS }}
           keyStorePassword: ${{ secrets.KEYSTORE_PASSWORD }}
           keyPassword: ${{ secrets.KEY_PASSWORD }}
+          buildToolsVersion: "34.0.0"
 
       - name: Upload Signed APK Artifact
         uses: actions/upload-artifact@v4
