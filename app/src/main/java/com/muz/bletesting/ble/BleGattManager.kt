@@ -20,10 +20,12 @@ class BleGattManager(private val context: Context) {
     // UUID Standard Industri
     private val BATTERY_SERVICE_UUID = UUID.fromString("0000180F-0000-1000-8000-00805F9B34FB")
     private val BATTERY_LEVEL_CHAR_UUID = UUID.fromString("00002A19-0000-1000-8000-00805F9B34FB")
+    private val CCCD_UUID = UUID.fromString("00002902-0000-1000-8000-00805F9B34FB")
 
     var onStatusChange: ((statusText: String, isConnected: Boolean) -> Unit)? = null
     var onServicesDiscovered: ((senaraiServis: List<String>, peratusBateri: Int?) -> Unit)? = null
     var onWriteResult: ((berjaya: Boolean, msg: String) -> Unit)? = null
+    var onNotifyDataReceived: ((charUuidShort: String, hex: String, textAscii: String) -> Unit)? = null
 
     private var peratusBateriTerkini: Int? = null
 
@@ -130,15 +132,84 @@ class BleGattManager(private val context: Context) {
                 if (status == BluetoothGatt.GATT_SUCCESS) {
                     onWriteResult?.invoke(true, "Bait berjaya ditulis ke perkakasan!")
                 } else {
-                    onWriteResult?.invoke(false, "Gagal menulis bait. Ralat status GATT: $status")
+                    onWriteResult?.invoke(false, "Gagal menulis bait. Ralat kod: $status")
                 }
             }
+        }
+
+        // Menerima data semburan berterusan (Notify / Indicate)
+        @Suppress("DEPRECATION")
+        override fun onCharacteristicChanged(
+            gatt: BluetoothGatt?,
+            characteristic: BluetoothGattCharacteristic?
+        ) {
+            super.onCharacteristicChanged(gatt, characteristic)
+            val data = characteristic?.value ?: return
+            prosesDataMasuk(characteristic.uuid.toString(), data)
+        }
+    }
+
+    private fun prosesDataMasuk(uuidStr: String, data: ByteArray) {
+        val shortUuid = formatUuidRingkas(uuidStr)
+        val hex = BleParserUtils.byteArrayToHex(data)
+        val ascii = data.map { b -> if (b in 32..126) b.toInt().toChar() else '.' }.joinToString("")
+
+        mainHandler.post {
+            onNotifyDataReceived?.invoke(shortUuid, hex, ascii)
         }
     }
 
     /**
-     * Menghantar arahan bait Hex mentah ke Characteristic sasaran
+     * Mengaktifkan atau mematikan siaran Notify/Indicate pada perkakasan
      */
+    @SuppressLint("MissingPermission")
+    fun tukarLanggananNotify(charUuidStr: String, aktifkan: Boolean): Boolean {
+        val gatt = bluetoothGatt ?: run {
+            onWriteResult?.invoke(false, "Tiada sambungan aktif!")
+            return false
+        }
+
+        val targetChar = cariKarakteristik(charUuidStr) ?: run {
+            onWriteResult?.invoke(false, "Karakteristik tidak dijumpai!")
+            return false
+        }
+
+        val prop = targetChar.properties
+        val isNotify = (prop and BluetoothGattCharacteristic.PROPERTY_NOTIFY != 0)
+        val isIndicate = (prop and BluetoothGattCharacteristic.PROPERTY_INDICATE != 0)
+
+        if (!isNotify && !isIndicate) {
+            onWriteResult?.invoke(false, "Karakteristik ini tidak menyokong Notify atau Indicate!")
+            return false
+        }
+
+        // 1. Beritahu lapisan Bluetooth telefon untuk dengar
+        gatt.setCharacteristicNotification(targetChar, aktifkan)
+
+        // 2. Beritahu cip mikropengawal luaran melalui descriptor CCCD (0x2902)
+        val descriptor = targetChar.getDescriptor(CCCD_UUID)
+        if (descriptor == null) {
+            onWriteResult?.invoke(false, "Descriptor CCCD (0x2902) tiada pada karakteristik ini!")
+            return false
+        }
+
+        val nilaiDescriptor = when {
+            !aktifkan -> BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE
+            isNotify -> BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+            else -> BluetoothGattDescriptor.ENABLE_INDICATION_VALUE
+        }
+
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val status = gatt.writeDescriptor(descriptor, nilaiDescriptor)
+            status == BluetoothStatusCodes.SUCCESS
+        } else {
+            @Suppress("DEPRECATION")
+            descriptor.value = nilaiDescriptor
+            @Suppress("DEPRECATION")
+            gatt.writeDescriptor(descriptor)
+        }
+    }
+
     @SuppressLint("MissingPermission")
     fun tulisHex(charUuidStr: String, hexPayload: String): Boolean {
         val gatt = bluetoothGatt ?: run {
@@ -153,41 +224,17 @@ class BleGattManager(private val context: Context) {
             return false
         }
 
-        val targetCharUuid = try {
-            if (charUuidStr.length == 4 || charUuidStr.length == 6) {
-                // Jika pengguna cuma masukkan 4 digit (cth: 2A19 atau 0x2A19)
-                val hex4 = charUuidStr.removePrefix("0x").removePrefix("0X")
-                UUID.fromString("0000$hex4-0000-1000-8000-00805F9B34FB")
-            } else {
-                UUID.fromString(charUuidStr)
-            }
-        } catch (e: Exception) {
-            onWriteResult?.invoke(false, "Format UUID Karakteristik tidak sah!")
+        val targetChar = cariKarakteristik(charUuidStr) ?: run {
+            onWriteResult?.invoke(false, "Karakteristik tidak ditemui!")
             return false
         }
 
-        // Cari characteristic dalam mana-mana servis yang tersedia
-        var targetChar: BluetoothGattCharacteristic? = null
-        for (service in gatt.services) {
-            val c = service.getCharacteristic(targetCharUuid)
-            if (c != null) {
-                targetChar = c
-                break
-            }
-        }
-
-        if (targetChar == null) {
-            onWriteResult?.invoke(false, "Karakteristik tidak ditemui pada peranti ini!")
-            return false
-        }
-
-        // Semak kebenaran menulis perkakasan
         val prop = targetChar.properties
         val canWrite = (prop and BluetoothGattCharacteristic.PROPERTY_WRITE != 0) ||
                 (prop and BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE != 0)
 
         if (!canWrite) {
-            onWriteResult?.invoke(false, "Karakteristik ini bersifat Read-Only (tiada kebenaran Write)!")
+            onWriteResult?.invoke(false, "Karakteristik ini bersifat Read-Only!")
             return false
         }
 
@@ -207,6 +254,26 @@ class BleGattManager(private val context: Context) {
             @Suppress("DEPRECATION")
             gatt.writeCharacteristic(targetChar)
         }
+    }
+
+    private fun cariKarakteristik(charUuidStr: String): BluetoothGattCharacteristic? {
+        val gatt = bluetoothGatt ?: return null
+        val targetCharUuid = try {
+            if (charUuidStr.length == 4 || charUuidStr.length == 6) {
+                val hex4 = charUuidStr.removePrefix("0x").removePrefix("0X")
+                UUID.fromString("0000$hex4-0000-1000-8000-00805F9B34FB")
+            } else {
+                UUID.fromString(charUuidStr)
+            }
+        } catch (e: Exception) {
+            return null
+        }
+
+        for (service in gatt.services) {
+            val c = service.getCharacteristic(targetCharUuid)
+            if (c != null) return c
+        }
+        return null
     }
 
     @SuppressLint("MissingPermission")
@@ -262,6 +329,7 @@ class BleGattManager(private val context: Context) {
             "0X2A24" -> "Model Number"
             "0X2A26" -> "Firmware Version"
             "0X2A28" -> "Software Version"
+            "0X2A37" -> "Heart Rate Measurement"
             else -> "Data Channel"
         }
     }
