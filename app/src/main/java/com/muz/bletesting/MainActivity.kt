@@ -1,6 +1,9 @@
 package com.muz.bletesting
 
 import android.Manifest
+import android.animation.ObjectAnimator
+import android.animation.PropertyValuesHolder
+import android.animation.ValueAnimator
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.bluetooth.le.AdvertiseSettings
@@ -13,6 +16,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
+import android.view.View
 import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -41,6 +45,9 @@ class MainActivity : AppCompatActivity() {
     private val deviceList = CopyOnWriteArrayList<BleTarget>()
     private lateinit var listAdapter: BleDeviceAdapter
     private var selectedTarget: BleTarget? = null
+
+    // Pemegang animasi denyutan untuk kotak status
+    private var pulseAnimator: ObjectAnimator? = null
 
     private val updateHandler = Handler(Looper.getMainLooper())
     @Volatile
@@ -103,6 +110,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         btnScan.setOnClickListener {
+            animasiTekanButang(it)
             if (scannerManager.isScanning) {
                 hentikanImbasan()
             } else {
@@ -111,12 +119,48 @@ class MainActivity : AppCompatActivity() {
         }
 
         btnBroadcast.setOnClickListener {
+            animasiTekanButang(it)
             mulakanPancaran()
         }
 
         btnStopBroadcast.setOnClickListener {
+            animasiTekanButang(it)
             hentikanPancaran()
         }
+    }
+
+    // --- FUNGSI ANIMASI UI ---
+
+    private fun animasiTekanButang(view: View) {
+        view.animate()
+            .scaleX(0.94f)
+            .scaleY(0.94f)
+            .setDuration(90)
+            .withEndAction {
+                view.animate().scaleX(1f).scaleY(1f).setDuration(90).start()
+            }
+            .start()
+    }
+
+    private fun mulaDenyutanRadar() {
+        if (pulseAnimator == null) {
+            pulseAnimator = ObjectAnimator.ofPropertyValuesHolder(
+                tvStatus,
+                PropertyValuesHolder.ofFloat(View.ALPHA, 1f, 0.45f)
+            ).apply {
+                duration = 700
+                repeatMode = ValueAnimator.REVERSE
+                repeatCount = ValueAnimator.INFINITE
+            }
+        }
+        if (pulseAnimator?.isStarted != true) {
+            pulseAnimator?.start()
+        }
+    }
+
+    private fun hentiDenyutanRadar() {
+        pulseAnimator?.cancel()
+        tvStatus.alpha = 1f
     }
 
     private fun initManagers() {
@@ -137,6 +181,7 @@ class MainActivity : AppCompatActivity() {
             },
             onError = { msg ->
                 runOnUiThread {
+                    hentiDenyutanRadar()
                     tvStatus.text = msg
                     btnScan.text = "1. Mula Imbas Signal"
                 }
@@ -147,6 +192,7 @@ class MainActivity : AppCompatActivity() {
             bluetoothAdapter = bluetoothAdapter,
             onSuccess = { settingsInEffect ->
                 runOnUiThread {
+                    mulaDenyutanRadar()
                     val target = selectedTarget
                     val hex = target?.let { BleParserUtils.byteArrayToHex(it.manufacturerData) } ?: "TIADA"
                     val txLabel = when (settingsInEffect?.txPowerLevel) {
@@ -167,7 +213,7 @@ class MainActivity : AppCompatActivity() {
                         ● SIGNAL SEDANG DIPANCARKAN SECARA AKTIF
                         
                         Peranti Sumber: ${target?.name}
-                        MAC Sumber: ${target?.address} (Rujuk data; pemancar guna RPA Android)
+                        MAC Sumber: ${target?.address}
                         ID Vendor: $vendorLabel
                         Kuasa TX: $txLabel [Paras Penuh Perkakasan]
                         Mod Latensi: LOW_LATENCY (Pancaran Berterusan)
@@ -180,6 +226,7 @@ class MainActivity : AppCompatActivity() {
             },
             onFailure = { errorMsg ->
                 runOnUiThread {
+                    hentiDenyutanRadar()
                     tvStatus.text = errorMsg
                 }
             }
@@ -226,6 +273,7 @@ class MainActivity : AppCompatActivity() {
         listAdapter.notifyDataSetChanged()
 
         if (scannerManager.mulaImbas()) {
+            mulaDenyutanRadar()
             btnScan.text = "Henti Imbas"
             tvStatus.text = "Sedang mengimbas di udara...\nKetik mana-mana peranti untuk simpan & pancar semula."
         }
@@ -233,6 +281,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun hentikanImbasan() {
         scannerManager.hentiImbas()
+        hentiDenyutanRadar()
         btnScan.text = "1. Mula Imbas Signal"
         updateHandler.removeCallbacks(uiUpdateRunnable)
         pendingUiUpdate = false
@@ -262,6 +311,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun hentikanPancaran() {
         advertiserManager.hentiPancar()
+        hentiDenyutanRadar()
         tvStatus.text = "Pancaran klon telah dihentikan sepenuhnya."
     }
 
@@ -311,6 +361,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        hentiDenyutanRadar()
         hentikanImbasan()
         hentikanPancaran()
     }
