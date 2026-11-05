@@ -29,6 +29,7 @@ import com.muz.bletesting.ble.BleScannerManager
 import com.muz.bletesting.dialog.BookmarkDialog
 import com.muz.bletesting.dialog.ManualInjectDialog
 import com.muz.bletesting.dialog.PacketDiffDialog
+import com.muz.bletesting.dialog.RssiTrackerDialog
 import com.muz.bletesting.model.BleTarget
 import com.muz.bletesting.storage.BleProfileStorage
 import com.muz.bletesting.utils.BleParserUtils
@@ -46,7 +47,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnStopBroadcast: Button
     private lateinit var btnBookmarks: Button
     private lateinit var btnManualInject: Button
-    private lateinit var btnDiff: Button
     private lateinit var btnExportCsv: Button
     private lateinit var lvDevices: ListView
 
@@ -60,8 +60,11 @@ class MainActivity : AppCompatActivity() {
     private lateinit var listAdapter: BleDeviceAdapter
     private var selectedTarget: BleTarget? = null
 
-    // Simpanan data paket sebelumnya untuk perbandingan Diff automatik
+    // Simpanan data paket rujukan untuk perbandingan Hex Diff
     private var previousHex: String = ""
+
+    // Pengurus dialog Radar Gelombang RSSI masa nyata
+    private var rssiTrackerDialog: RssiTrackerDialog? = null
 
     private var pulseAnimator: ObjectAnimator? = null
 
@@ -99,7 +102,7 @@ class MainActivity : AppCompatActivity() {
     ) { permissions ->
         val allGranted = permissions.entries.all { it.value }
         if (!allGranted) {
-            Toast.makeText(this, "Kebenaran Bluetooth diperlukan!", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Izin Bluetooth diperlukan!", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -115,7 +118,6 @@ class MainActivity : AppCompatActivity() {
         btnStopBroadcast = findViewById(R.id.btnStopBroadcast)
         btnBookmarks = findViewById(R.id.btnBookmarks)
         btnManualInject = findViewById(R.id.btnManualInject)
-        btnDiff = findViewById(R.id.btnDiff)
         btnExportCsv = findViewById(R.id.btnExportCsv)
         lvDevices = findViewById(R.id.lvDevices)
 
@@ -144,6 +146,37 @@ class MainActivity : AppCompatActivity() {
             override fun onStopTrackingTouch(seekBar: SeekBar?) {}
         })
 
+        // Ketik kotak status untuk buka Radar Gelombang RSSI masa nyata
+        tvStatus.setOnClickListener {
+            val target = selectedTarget
+            if (target != null) {
+                rssiTrackerDialog = RssiTrackerDialog(this, target).apply { show() }
+            } else {
+                Toast.makeText(this, "Sila imbas dan pilih peranti sasaran dahulu!", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        // Tekan lama kotak status untuk buka Pembanding Hex Diff
+        tvStatus.setOnLongClickListener {
+            val target = selectedTarget
+            if (target != null) {
+                val hexSemasa = if (target.isServiceData) {
+                    BleParserUtils.byteArrayToHex(target.serviceData)
+                } else {
+                    BleParserUtils.byteArrayToHex(target.manufacturerData)
+                }
+
+                PacketDiffDialog.tunjuk(
+                    context = this,
+                    defaultHexAsal = previousHex,
+                    defaultHexBaru = hexSemasa
+                )
+            } else {
+                Toast.makeText(this, "Tiada peranti sasaran untuk dibandingkan!", Toast.LENGTH_SHORT).show()
+            }
+            true
+        }
+
         lvDevices.setOnItemClickListener { _, _, position, _ ->
             val item = listAdapter.getItem(position) ?: return@setOnItemClickListener
             kunciTarget(item)
@@ -157,7 +190,7 @@ class MainActivity : AppCompatActivity() {
             val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             val clip = ClipData.newPlainText("BLE Hex", hex)
             clipboard.setPrimaryClip(clip)
-            Toast.makeText(this, "Hex disalin ke Clipboard!", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Hex berhasil disalin ke Clipboard!", Toast.LENGTH_SHORT).show()
             true
         }
 
@@ -189,30 +222,15 @@ class MainActivity : AppCompatActivity() {
             ManualInjectDialog.tunjuk(this) { targetManual ->
                 kunciTarget(targetManual)
                 profileStorage.simpanKeBookmark(targetManual)
-                Toast.makeText(this, "Target Manual Disediakan!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Target Manual Disiapkan!", Toast.LENGTH_SHORT).show()
             }
-        }
-
-        // Buka Pembanding Paket Hex (Diff)
-        btnDiff.setOnClickListener {
-            animasiButang(it)
-            val hexSemasa = selectedTarget?.let { target ->
-                if (target.isServiceData) BleParserUtils.byteArrayToHex(target.serviceData)
-                else BleParserUtils.byteArrayToHex(target.manufacturerData)
-            } ?: ""
-
-            PacketDiffDialog.tunjuk(
-                context = this,
-                defaultHexAsal = previousHex,
-                defaultHexBaru = hexSemasa
-            )
         }
 
         btnExportCsv.setOnClickListener {
             animasiButang(it)
             val berjaya = CsvExportHelper.eksportDanKongsi(this, deviceList)
             if (!berjaya) {
-                Toast.makeText(this, "Tiada data untuk dieksport!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Tidak ada data untuk diekspor!", Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -220,7 +238,7 @@ class MainActivity : AppCompatActivity() {
     private fun kunciTarget(item: BleTarget) {
         val hexData = if (item.isServiceData) BleParserUtils.byteArrayToHex(item.serviceData) else BleParserUtils.byteArrayToHex(item.manufacturerData)
 
-        // Jika sasaran sama diketik semula dengan bait berbeza, simpan bait lama ke previousHex
+        // Simpan rekod paket lama jika ada pertukaran bait pada peranti
         if (selectedTarget != null) {
             val oldHex = if (selectedTarget!!.isServiceData) BleParserUtils.byteArrayToHex(selectedTarget!!.serviceData) else BleParserUtils.byteArrayToHex(selectedTarget!!.manufacturerData)
             if (oldHex != hexData && oldHex.isNotBlank()) {
@@ -247,6 +265,7 @@ class MainActivity : AppCompatActivity() {
             Data Hex: $hexData
             
             (Sedia untuk dipancar! Tekan 'Pancar')
+            [Ketik: Buka Radar | Tekan Lama: Hex Diff]
         """.trimIndent()
     }
 
@@ -291,8 +310,16 @@ class MainActivity : AppCompatActivity() {
                     deviceList.add(target)
                 }
 
+                // Jika target aktif dikesan di udara
                 if (selectedTarget?.address == target.address) {
                     proximityManager.semakJarak(target.rssi)
+
+                    // Suap bacaan RSSI langsung ke Radar Gelombang jika dialog sedang aktif
+                    if (rssiTrackerDialog?.isShowing == true) {
+                        runOnUiThread {
+                            rssiTrackerDialog?.kemasKiniRssi(target.rssi)
+                        }
+                    }
                 }
 
                 if (!pendingUiUpdate) {
@@ -443,6 +470,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        rssiTrackerDialog?.dismiss()
         cleanupHandler.removeCallbacks(cleanupRunnable)
         proximityManager.hentiSemua()
         hentiDenyutanRadar()
