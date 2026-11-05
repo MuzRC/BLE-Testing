@@ -64,10 +64,10 @@
     <!-- Ruang Paparan Pokok Servis (Scrollable) -->
     <ScrollView
         android:layout_width="match_parent"
-        android:layout_height="240dp"
+        android:layout_height="160dp"
         android:background="#0A0B10"
         android:padding="8dp"
-        android:layout_marginBottom="12dp">
+        android:layout_marginBottom="10dp">
 
         <TextView
             android:id="@+id/tvGattServicesTree"
@@ -79,6 +79,69 @@
             android:lineSpacingExtra="3dp"
             android:text="Sedang membaca struktur GATT dalaman..." />
     </ScrollView>
+
+    <!-- Kotak Borang Hantar Arahan Write Hex -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="#1B1E2E"
+        android:padding="10dp"
+        android:layout_marginBottom="12dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="✎ Hantar Arahan Hex (Write Characteristic):"
+            android:textColor="#B388FF"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="6dp" />
+
+        <EditText
+            android:id="@+id/etWriteCharUuid"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="UUID Karakteristik (cth: 2A06 atau UUID penuh)"
+            android:textColorHint="#666677"
+            android:textColor="#FFFFFF"
+            android:textSize="11sp"
+            android:fontFamily="monospace"
+            android:background="#0F1018"
+            android:padding="8dp"
+            android:layout_marginBottom="6dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <EditText
+                android:id="@+id/etWriteHexValue"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:hint="Payload Hex (cth: 01FF)"
+                android:textColorHint="#666677"
+                android:textColor="#00E5FF"
+                android:textSize="11sp"
+                android:fontFamily="monospace"
+                android:background="#0F1018"
+                android:padding="8dp"
+                android:inputType="textCapCharacters" />
+
+            <Button
+                android:id="@+id/btnSendHex"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Tulis"
+                android:backgroundTint="#B388FF"
+                android:textColor="#000000"
+                android:textStyle="bold"
+                android:textSize="11sp"
+                android:layout_marginStart="6dp" />
+        </LinearLayout>
+    </LinearLayout>
 
     <!-- Butang Tindakan -->
     <LinearLayout
