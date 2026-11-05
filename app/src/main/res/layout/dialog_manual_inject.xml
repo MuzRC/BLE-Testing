@@ -5,12 +5,30 @@
     android:orientation="vertical"
     android:padding="20dp">
 
+    <Button
+        android:id="@+id/btnPilihPreset"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="★ Guna Templat Siap (Presets)"
+        android:backgroundTint="#6200EE"
+        android:textColor="#FFFFFF"
+        android:textSize="12sp"
+        android:layout_marginBottom="14dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Atau Masukkan Nilai Manual:"
+        android:textColor="#888888"
+        android:textSize="11sp"
+        android:layout_marginBottom="8dp" />
+
     <EditText
         android:id="@+id/etInjectName"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:hint="Nama Label (cth: Beacon Makmal)"
-        android:layout_marginBottom="12dp" />
+        android:layout_marginBottom="10dp" />
 
     <EditText
         android:id="@+id/etInjectVendorId"
@@ -18,13 +36,14 @@
         android:layout_height="wrap_content"
         android:hint="Vendor ID Decimal (cth: 2000, -1 jika tiada)"
         android:inputType="numberSigned"
-        android:layout_marginBottom="12dp" />
+        android:layout_marginBottom="10dp" />
 
     <EditText
         android:id="@+id/etInjectHex"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="Payload Hex (cth: 8903000000C0...)"
+        android:hint="Payload Hex Mentah"
         android:fontFamily="monospace"
         android:inputType="textCapCharacters" />
+
 </LinearLayout>
