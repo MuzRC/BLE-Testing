@@ -7,6 +7,8 @@ import android.animation.ValueAnimator
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.bluetooth.le.AdvertiseSettings
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -24,21 +26,31 @@ import androidx.core.content.ContextCompat
 import com.muz.bletesting.adapter.BleDeviceAdapter
 import com.muz.bletesting.ble.BleAdvertiserManager
 import com.muz.bletesting.ble.BleScannerManager
+import com.muz.bletesting.dialog.BookmarkDialog
+import com.muz.bletesting.dialog.ManualInjectDialog
 import com.muz.bletesting.model.BleTarget
-import com.muz.bletesting.storage.BleStorageManager
+import com.muz.bletesting.storage.BleProfileStorage
 import com.muz.bletesting.utils.BleParserUtils
+import com.muz.bletesting.utils.CsvExportHelper
+import com.muz.bletesting.utils.ProximityAlertManager
 import java.util.concurrent.CopyOnWriteArrayList
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var tvStatus: TextView
+    private lateinit var tvRssiLabel: TextView
+    private lateinit var sbRssi: SeekBar
     private lateinit var btnScan: Button
     private lateinit var btnBroadcast: Button
     private lateinit var btnStopBroadcast: Button
+    private lateinit var btnBookmarks: Button
+    private lateinit var btnManualInject: Button
+    private lateinit var btnExportCsv: Button
     private lateinit var lvDevices: ListView
 
     private var bluetoothAdapter: BluetoothAdapter? = null
-    private lateinit var storageManager: BleStorageManager
+    private lateinit var profileStorage: BleProfileStorage
+    private lateinit var proximityManager: ProximityAlertManager
     private lateinit var scannerManager: BleScannerManager
     private lateinit var advertiserManager: BleAdvertiserManager
 
@@ -52,7 +64,6 @@ class MainActivity : AppCompatActivity() {
     @Volatile
     private var pendingUiUpdate = false
 
-    // Susun senarai ikut kekuatan signal (RSSI paling tinggi di atas)
     private val uiUpdateRunnable = Runnable {
         val now = System.currentTimeMillis()
         deviceList.removeIf { now - it.lastSeen > 10000 }
@@ -63,15 +74,14 @@ class MainActivity : AppCompatActivity() {
         pendingUiUpdate = false
     }
 
-    // Pembersih berkala: Buang peranti yang hilang melebihi 10 saat
     private val cleanupHandler = Handler(Looper.getMainLooper())
     private val cleanupRunnable = object : Runnable {
         override fun run() {
             if (scannerManager.isScanning) {
                 val now = System.currentTimeMillis()
-                val sizeSebelum = deviceList.size
+                val saizSebelum = deviceList.size
                 deviceList.removeIf { now - it.lastSeen > 10000 }
-                if (deviceList.size != sizeSebelum) {
+                if (deviceList.size != saizSebelum) {
                     listAdapter.notifyDataSetChanged()
                 }
                 cleanupHandler.postDelayed(this, 3000)
@@ -84,7 +94,7 @@ class MainActivity : AppCompatActivity() {
     ) { permissions ->
         val allGranted = permissions.entries.all { it.value }
         if (!allGranted) {
-            Toast.makeText(this, "Kebenaran Bluetooth diperlukan untuk operasi penuh!", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Kebenaran Bluetooth diperlukan!", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -93,80 +103,132 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         tvStatus = findViewById(R.id.tvStatus)
+        tvRssiLabel = findViewById(R.id.tvRssiLabel)
+        sbRssi = findViewById(R.id.sbRssi)
         btnScan = findViewById(R.id.btnScan)
         btnBroadcast = findViewById(R.id.btnBroadcast)
         btnStopBroadcast = findViewById(R.id.btnStopBroadcast)
+        btnBookmarks = findViewById(R.id.btnBookmarks)
+        btnManualInject = findViewById(R.id.btnManualInject)
+        btnExportCsv = findViewById(R.id.btnExportCsv)
         lvDevices = findViewById(R.id.lvDevices)
 
         val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
         bluetoothAdapter = bluetoothManager.adapter
-        storageManager = BleStorageManager(this)
+        profileStorage = BleProfileStorage(this)
+        proximityManager = ProximityAlertManager(this)
 
         initManagers()
 
         listAdapter = BleDeviceAdapter(this, deviceList)
         lvDevices.adapter = listAdapter
 
-        muatDataTersimpan()
+        setupControls()
         semakKebenaran()
+    }
 
+    private fun setupControls() {
+        // Kawalan Slider RSSI (-100 dBm hingga -40 dBm)
+        sbRssi.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                val rssi = -100 + progress
+                scannerManager.rssiThreshold = rssi
+                tvRssiLabel.text = "Tapis: $rssi dBm"
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+        })
+
+        // Ketik untuk Simpan & Kunci Target
         lvDevices.setOnItemClickListener { _, _, position, _ ->
             val item = listAdapter.getItem(position) ?: return@setOnItemClickListener
-            selectedTarget = item
-            hentikanImbasan()
+            kunciTarget(item)
+            profileStorage.simpanKeBookmark(item)
+            Toast.makeText(this, "${item.name} disimpan ke Bookmark!", Toast.LENGTH_SHORT).show()
+        }
 
-            storageManager.simpanTarget(item)
-
-            val infoJenis = if (item.manufacturerId != -1) {
-                "Jenis: Manufacturer Data (ID: ${item.manufacturerId})"
-            } else if (item.serviceUuid != null) {
-                "Jenis: Service Data (${BleParserUtils.formatShortUuid(item.serviceUuid)})"
-            } else {
-                "Jenis: Raw Data"
-            }
-
-            val hexData = storageManager.dapatkanDisplayData(item)
-            tvStatus.text = """
-                PROFIL DISIMPAN KE STORAN KEKAL:
-                
-                Peranti: ${item.name}
-                MAC Sumber: ${item.address}
-                $infoJenis
-                Data Hex: $hexData
-                
-                (Sedia dipancar dengan struktur protokol tepat! Tekan 'Pancar')
-            """.trimIndent()
-            Toast.makeText(this, "${item.name} telah disimpan!", Toast.LENGTH_SHORT).show()
+        // Tekan lama pada senarai untuk salin data Hex ke papan keratan (Clipboard)
+        lvDevices.setOnItemLongClickListener { _, _, position, _ ->
+            val item = listAdapter.getItem(position) ?: return@setOnItemLongClickListener
+            val hex = if (item.isServiceData) BleParserUtils.byteArrayToHex(item.serviceData) else BleParserUtils.byteArrayToHex(item.manufacturerData)
+            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            val clip = ClipData.newPlainText("BLE Hex", hex)
+            clipboard.setPrimaryClip(clip)
+            Toast.makeText(this, "Hex berjaya disalin ke Clipboard!", Toast.LENGTH_SHORT).show()
+            true
         }
 
         btnScan.setOnClickListener {
-            animasiTekanButang(it)
-            if (scannerManager.isScanning) {
-                hentikanImbasan()
-            } else {
-                mulakanImbasan()
-            }
+            animasiButang(it)
+            if (scannerManager.isScanning) hentikanImbasan() else mulakanImbasan()
         }
 
         btnBroadcast.setOnClickListener {
-            animasiTekanButang(it)
+            animasiButang(it)
             mulakanPancaran()
         }
 
         btnStopBroadcast.setOnClickListener {
-            animasiTekanButang(it)
+            animasiButang(it)
             hentikanPancaran()
+        }
+
+        btnBookmarks.setOnClickListener {
+            animasiButang(it)
+            BookmarkDialog.tunjuk(this, profileStorage) { targetDipilih ->
+                kunciTarget(targetDipilih)
+                Toast.makeText(this, "Profil ${targetDipilih.name} dipilih!", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        btnManualInject.setOnClickListener {
+            animasiButang(it)
+            ManualInjectDialog.tunjuk(this) { targetManual ->
+                kunciTarget(targetManual)
+                profileStorage.simpanKeBookmark(targetManual)
+                Toast.makeText(this, "Target Manual Disediakan!", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        btnExportCsv.setOnClickListener {
+            animasiButang(it)
+            val berjaya = CsvExportHelper.eksportDanKongsi(this, deviceList)
+            if (!berjaya) {
+                Toast.makeText(this, "Tiada data untuk dieksport!", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
-    private fun animasiTekanButang(view: View) {
+    private fun kunciTarget(item: BleTarget) {
+        selectedTarget = item
+        hentikanImbasan()
+
+        val infoJenis = if (item.manufacturerId != -1) {
+            "Jenis: Manufacturer Data (ID: ${item.manufacturerId})"
+        } else if (item.serviceUuid != null) {
+            "Jenis: Service Data (${BleParserUtils.formatShortUuid(item.serviceUuid)})"
+        } else {
+            "Jenis: Raw Data"
+        }
+
+        val hexData = if (item.isServiceData) BleParserUtils.byteArrayToHex(item.serviceData) else BleParserUtils.byteArrayToHex(item.manufacturerData)
+        tvStatus.text = """
+            PROFIL AKTIF:
+            Peranti: ${item.name}
+            MAC Sumber: ${item.address}
+            $infoJenis
+            Data Hex: $hexData
+            
+            (Sedia untuk dipancar! Tekan 'Pancar')
+        """.trimIndent()
+    }
+
+    private fun animasiButang(view: View) {
         view.animate()
             .scaleX(0.94f)
             .scaleY(0.94f)
             .setDuration(90)
-            .withEndAction {
-                view.animate().scaleX(1f).scaleY(1f).setDuration(90).start()
-            }
+            .withEndAction { view.animate().scaleX(1f).scaleY(1f).setDuration(90).start() }
             .start()
     }
 
@@ -181,9 +243,7 @@ class MainActivity : AppCompatActivity() {
                 repeatCount = ValueAnimator.INFINITE
             }
         }
-        if (pulseAnimator?.isStarted != true) {
-            pulseAnimator?.start()
-        }
+        if (pulseAnimator?.isStarted != true) pulseAnimator?.start()
     }
 
     private fun hentiDenyutanRadar() {
@@ -202,6 +262,11 @@ class MainActivity : AppCompatActivity() {
                     deviceList[existingIndex] = target
                 } else {
                     deviceList.add(target)
+                }
+
+                // Jika peranti ini adalah sasaran yang dikunci, cetuskan radar getaran
+                if (selectedTarget?.address == target.address) {
+                    proximityManager.semakJarak(target.rssi)
                 }
 
                 if (!pendingUiUpdate) {
@@ -224,7 +289,7 @@ class MainActivity : AppCompatActivity() {
                 runOnUiThread {
                     mulaDenyutanRadar()
                     val target = selectedTarget
-                    val hex = target?.let { storageManager.dapatkanDisplayData(it) } ?: "TIADA"
+                    val hex = target?.let { if (it.isServiceData) BleParserUtils.byteArrayToHex(it.serviceData) else BleParserUtils.byteArrayToHex(it.manufacturerData) } ?: "TIADA"
                     val payloadSize = if (target?.isServiceData == true) target.serviceData.size else target?.manufacturerData?.size ?: 0
 
                     val txLabel = when (settingsInEffect?.txPowerLevel) {
@@ -245,14 +310,10 @@ class MainActivity : AppCompatActivity() {
 
                     tvStatus.text = """
                         ● SIGNAL SEDANG DIPANCARKAN SECARA TEPAT
-                        
-                        Peranti Sumber: ${target?.name}
-                        MAC Sumber: ${target?.address} (Rujuk data; pemancar guna RPA Android)
+                        Peranti: ${target?.name}
+                        MAC Sumber: ${target?.address}
                         $infoJenis
-                        Kuasa TX: $txLabel [Paras Penuh Perkakasan]
-                        Mod Latensi: LOW_LATENCY (Pancaran Berterusan)
-                        Anggaran Liputan: 10 - 20 meter (kawasan terbuka)
-                        
+                        Kuasa TX: $txLabel
                         Payload ($payloadSize Bytes):
                         $hex
                     """.trimIndent()
@@ -267,46 +328,20 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
-    private fun muatDataTersimpan() {
-        val target = storageManager.muatTarget()
-        if (target != null) {
-            selectedTarget = target
-            val hex = storageManager.dapatkanDisplayData(target)
-            val infoJenis = if (target.manufacturerId != -1) {
-                "ID Vendor: ${target.manufacturerId}"
-            } else if (target.serviceUuid != null) {
-                "Service UUID: ${BleParserUtils.formatShortUuid(target.serviceUuid)}"
-            } else {
-                "Raw Data"
-            }
-
-            tvStatus.text = """
-                DATA TERSIMPAN DIMUATKAN SEMULA:
-                
-                Peranti: ${target.name}
-                MAC Sumber: ${target.address}
-                $infoJenis
-                Data Hex: $hex
-                
-                (Sedia dipancar tanpa perlu imbas! Tekan butang 'Pancar')
-            """.trimIndent()
-        }
-    }
-
     private fun mulakanImbasan() {
         if (!adaKebenaranBle()) {
             semakKebenaran()
-            tvStatus.text = "Kebenaran Bluetooth belum lengkap. Sila benarkan akses dahulu."
+            tvStatus.text = "Kebenaran Bluetooth diperlukan."
             return
         }
 
         if (bluetoothAdapter == null || !bluetoothAdapter!!.isEnabled) {
-            tvStatus.text = "Sila hidupkan Bluetooth telefon dahulu."
+            tvStatus.text = "Sila hidupkan Bluetooth telefon."
             return
         }
 
         if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.R && !isLocationServiceEnabled()) {
-            tvStatus.text = "Sila aktifkan GPS/Lokasi di bar notifikasi untuk mengimbas BLE!"
+            tvStatus.text = "Aktifkan GPS/Lokasi untuk imbasan BLE."
             startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS))
             return
         }
@@ -317,8 +352,7 @@ class MainActivity : AppCompatActivity() {
         if (scannerManager.mulaImbas()) {
             mulaDenyutanRadar()
             btnScan.text = "Henti Imbas"
-            tvStatus.text = "Sedang mengimbas di udara...\nKetik mana-mana peranti untuk simpan & pancar semula."
-            // Mulakan kitaran pembersihan peranti terputus
+            tvStatus.text = "Mengimbas di udara...\nKetik senarai untuk simpan. Tekan lama untuk salin Hex."
             cleanupHandler.postDelayed(cleanupRunnable, 3000)
         }
     }
@@ -326,6 +360,7 @@ class MainActivity : AppCompatActivity() {
     private fun hentikanImbasan() {
         scannerManager.hentiImbas()
         cleanupHandler.removeCallbacks(cleanupRunnable)
+        proximityManager.hentiSemua()
         hentiDenyutanRadar()
         btnScan.text = "1. Mula Imbas Signal"
         updateHandler.removeCallbacks(uiUpdateRunnable)
@@ -335,29 +370,22 @@ class MainActivity : AppCompatActivity() {
     private fun mulakanPancaran() {
         if (!adaKebenaranBle()) {
             semakKebenaran()
-            tvStatus.text = "Kebenaran Bluetooth belum lengkap untuk memancar."
             return
         }
 
         val target = selectedTarget
         if (target == null) {
-            tvStatus.text = "Tiada signal dipilih atau tersimpan! Sila imbas dahulu."
+            tvStatus.text = "Tiada signal dipilih! Sila imbas atau pilih profil dahulu."
             return
         }
 
-        if (bluetoothAdapter == null || !bluetoothAdapter!!.isEnabled) {
-            tvStatus.text = "Sila hidupkan Bluetooth telefon dahulu."
-            return
-        }
-
-        tvStatus.text = "Menghantar arahan pemancar ke cip radio telefon..."
         advertiserManager.mulaPancar(target)
     }
 
     private fun hentikanPancaran() {
         advertiserManager.hentiPancar()
         hentiDenyutanRadar()
-        tvStatus.text = "Pancaran klon telah dihentikan sepenuhnya."
+        tvStatus.text = "Pancaran dihentikan."
     }
 
     private fun adaKebenaranBle(): Boolean {
@@ -371,42 +399,26 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun semakKebenaran() {
-        val permissionsToRequest = mutableListOf<String>()
-
+        val list = mutableListOf<String>()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
-                permissionsToRequest.add(Manifest.permission.BLUETOOTH_SCAN)
-            }
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_ADVERTISE) != PackageManager.PERMISSION_GRANTED) {
-                permissionsToRequest.add(Manifest.permission.BLUETOOTH_ADVERTISE)
-            }
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
-                permissionsToRequest.add(Manifest.permission.BLUETOOTH_CONNECT)
-            }
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) list.add(Manifest.permission.BLUETOOTH_SCAN)
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_ADVERTISE) != PackageManager.PERMISSION_GRANTED) list.add(Manifest.permission.BLUETOOTH_ADVERTISE)
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) list.add(Manifest.permission.BLUETOOTH_CONNECT)
         } else {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                permissionsToRequest.add(Manifest.permission.ACCESS_FINE_LOCATION)
-            }
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) list.add(Manifest.permission.ACCESS_FINE_LOCATION)
         }
-
-        if (permissionsToRequest.isNotEmpty()) {
-            requestPermissionLauncher.launch(permissionsToRequest.toTypedArray())
-        }
+        if (list.isNotEmpty()) requestPermissionLauncher.launch(list.toTypedArray())
     }
 
     private fun isLocationServiceEnabled(): Boolean {
-        val locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            locationManager.isLocationEnabled
-        } else {
-            locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) ||
-            locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
-        }
+        val lm = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) lm.isLocationEnabled else lm.isProviderEnabled(LocationManager.GPS_PROVIDER)
     }
 
     override fun onDestroy() {
         super.onDestroy()
         cleanupHandler.removeCallbacks(cleanupRunnable)
+        proximityManager.hentiSemua()
         hentiDenyutanRadar()
         hentikanImbasan()
         hentikanPancaran()
