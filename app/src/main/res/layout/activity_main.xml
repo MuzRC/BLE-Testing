@@ -15,12 +15,12 @@
         android:textAlignment="center"
         android:layout_marginBottom="8dp" />
 
-    <!-- Bar Butang Alat: Profil, Inject Manual & Eksport CSV -->
+    <!-- Bar Butang Alat 4 Slot: Profil, Inject, Diff & CSV -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:weightSum="3"
+        android:weightSum="4"
         android:layout_marginBottom="8dp">
 
         <Button
@@ -29,25 +29,34 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="★ Profil"
-            android:textSize="12sp" />
+            android:textSize="11sp" />
 
         <Button
             android:id="@+id/btnManualInject"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:layout_marginStart="4dp"
-            android:layout_marginEnd="4dp"
+            android:layout_marginStart="3dp"
             android:text="✎ Inject"
-            android:textSize="12sp" />
+            android:textSize="11sp" />
+
+        <Button
+            android:id="@+id/btnDiff"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="3dp"
+            android:text="⇄ Diff"
+            android:textSize="11sp" />
 
         <Button
             android:id="@+id/btnExportCsv"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
+            android:layout_marginStart="3dp"
             android:text="⤓ CSV"
-            android:textSize="12sp" />
+            android:textSize="11sp" />
     </LinearLayout>
 
     <!-- Kawalan Slider Jarak RSSI Masa Nyata -->
